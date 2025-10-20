@@ -1,0 +1,25 @@
+{"puzzle_type": "Shadow_Plausible", "puzzle_id": "shadow0", "user_answer": [0, 2, 3, 4, 8, 7], "correct_answer": [0, 2, 3, 4, 7, 8], "correct": true, "timestamp": "2025-10-20T17:00:30.875Z"}
+{"puzzle_type": "Mirror", "puzzle_id": "mirror0", "user_answer": [3], "correct_answer": [3], "correct": true, "timestamp": "2025-10-20T17:19:00.088Z"}
+{"puzzle_type": "Dice_Count", "puzzle_id": "dice17.png", "user_answer": "12", "correct_answer": 37, "correct": false, "elapsed_time": "2.19", "timestamp": "2025-10-20T17:25:00.289Z"}
+{"puzzle_type": "Bingo", "puzzle_id": "bingo2.png", "user_answer": [4, 5], "correct_answer": [[4, 7]], "correct": false, "elapsed_time": "2.08", "timestamp": "2025-10-20T17:25:04.389Z"}
+{"puzzle_type": "Shadow_Plausible", "puzzle_id": "shadow0", "user_answer": [7, 8, 5, 4], "correct_answer": [0, 2, 3, 4, 7, 8], "correct": false, "elapsed_time": "2.38", "timestamp": "2025-10-20T17:25:08.797Z"}
+{"puzzle_type": "Mirror", "puzzle_id": "mirror0", "user_answer": [3], "correct_answer": [3], "correct": true, "elapsed_time": "16.70", "timestamp": "2025-10-20T17:25:27.512Z"}
+{"puzzle_type": "Dice_Count", "puzzle_id": "dice13.png", "user_answer": "1", "correct_answer": 24, "correct": false, "elapsed_time": "3.28", "timestamp": "2025-10-20T17:25:32.806Z"}
+{"puzzle_type": "Bingo", "puzzle_id": "bingo24.png", "user_answer": [5, 4], "correct_answer": [[4, 5]], "correct": true, "elapsed_time": "2.74", "timestamp": "2025-10-20T17:25:37.562Z"}
+{"puzzle_type": "Shadow_Plausible", "puzzle_id": "shadow0", "user_answer": [8], "correct_answer": [0, 2, 3, 4, 7, 8], "correct": false, "elapsed_time": "6.90", "timestamp": "2025-10-20T17:25:46.475Z"}
+{"puzzle_type": "Mirror", "puzzle_id": "mirror0", "user_answer": [3], "correct_answer": [3], "correct": true, "elapsed_time": "11.25", "timestamp": "2025-10-20T17:36:22.244Z"}
+{"puzzle_type": "Dice_Count", "puzzle_id": "dice20.png", "user_answer": "12312", "correct_answer": 37, "correct": false, "elapsed_time": "3.81", "timestamp": "2025-10-20T17:36:28.074Z"}
+{"puzzle_type": "Bingo", "puzzle_id": "bingo19.png", "user_answer": [6, 5], "correct_answer": [[3, 7], [0, 8]], "correct": false, "elapsed_time": "50.63", "timestamp": "2025-10-20T17:37:20.720Z"}
+{"puzzle_type": "Shadow_Plausible", "puzzle_id": "shadow0", "user_answer": [8], "correct_answer": [0, 2, 3, 4, 7, 8], "correct": false, "elapsed_time": "2.10", "timestamp": "2025-10-20T17:37:24.839Z"}
+{"puzzle_type": "Mirror", "puzzle_id": "mirror0", "user_answer": [3], "correct_answer": [3], "correct": true, "elapsed_time": "6.04", "timestamp": "2025-10-20T17:39:08.333Z"}
+{"puzzle_type": "Bingo", "puzzle_id": "bingo23.png", "user_answer": [1, 8], "correct_answer": [[4, 6], [1, 8]], "correct": true, "elapsed_time": "3.06", "timestamp": "2025-10-20T17:40:30.565Z"}
+{"puzzle_type": "Shadow_Plausible", "puzzle_id": "shadow0", "user_answer": [8], "correct_answer": [0, 2, 3, 4, 7, 8], "correct": false, "elapsed_time": "1.71", "timestamp": "2025-10-20T17:40:34.285Z"}
+{"puzzle_type": "Mirror", "puzzle_id": "mirror0", "user_answer": [3], "correct_answer": [3], "correct": true, "elapsed_time": "1.37", "timestamp": "2025-10-20T17:40:37.673Z"}
+{"puzzle_type": "Dice_Count", "puzzle_id": "dice4.png", "user_answer": "1", "correct_answer": 73, "correct": false, "elapsed_time": "2.57", "timestamp": "2025-10-20T17:40:42.258Z"}
+{"puzzle_type": "Bingo", "puzzle_id": "bingo17.png", "user_answer": [7, 1], "correct_answer": [[1, 7]], "correct": true, "elapsed_time": "33.14", "timestamp": "2025-10-20T17:41:17.410Z"}
+{"puzzle_type": "Dice_Count", "puzzle_id": "dice19.png", "user_answer": "1", "correct_answer": 23, "correct": false, "elapsed_time": "1.67", "timestamp": "2025-10-20T17:41:26.570Z"}
+{"puzzle_type": "Bingo", "puzzle_id": "bingo6.png", "user_answer": [6, 3], "correct_answer": [[3, 6], [2, 5]], "correct": true, "elapsed_time": "2.22", "timestamp": "2025-10-20T17:41:30.809Z"}
+{"puzzle_type": "Shadow_Plausible", "puzzle_id": "shadow0", "user_answer": [8], "correct_answer": [0, 2, 3, 4, 7, 8], "correct": false, "elapsed_time": "1.72", "timestamp": "2025-10-20T17:41:34.551Z"}
+{"puzzle_type": "Bingo", "puzzle_id": "bingo19.png", "user_answer": [4, 7], "correct_answer": [[3, 7], [0, 8]], "correct": false, "elapsed_time": "4.72", "timestamp": "2025-10-20T17:50:05.005Z"}
+{"puzzle_type": "Shadow_Plausible", "puzzle_id": "shadow0", "user_answer": [0, 2, 3, 4, 7, 8], "correct_answer": [0, 2, 3, 4, 7, 8], "correct": true, "elapsed_time": "16.67", "timestamp": "2025-10-20T17:50:23.696Z"}
+{"puzzle_type": "Mirror", "puzzle_id": "mirror0", "user_answer": [3], "correct_answer": [3], "correct": true, "elapsed_time": "1.85", "timestamp": "2025-10-20T17:50:27.567Z"}

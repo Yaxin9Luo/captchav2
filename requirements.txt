@@ -1,0 +1,5 @@
+flask
+werkzeug
+flask-cors
+pillow
+gunicorn
