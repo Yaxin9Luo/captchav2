@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let deformationSelectedIndex = null;
     let squiggleSelectedIndex = null;
     let squiggleRevealTimeout = null;
+    let colorCipherRevealTimeout = null;
 
     submitBtn.addEventListener('click', submitAnswer);
     userAnswerInput.addEventListener('keypress', (event) => {
@@ -41,6 +42,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (squiggleRevealTimeout) {
             clearTimeout(squiggleRevealTimeout);
             squiggleRevealTimeout = null;
+        }
+        if (colorCipherRevealTimeout) {
+            clearTimeout(colorCipherRevealTimeout);
+            colorCipherRevealTimeout = null;
         }
 
         if (inputGroup) {
@@ -78,7 +83,9 @@ document.addEventListener('DOMContentLoaded', () => {
             '.deformation-submit',
             '.squiggle-preview',
             '.squiggle-options-grid',
-            '.squiggle-submit'
+            '.squiggle-submit',
+            '.color-cipher-preview',
+            '.color-cipher-question'
         ];
 
         customSelectors.forEach((selector) => {
@@ -121,6 +128,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
             case 'squiggle_select':
                 setupSquiggleSelect(data);
+                break;
+            case 'color_cipher':
+                setupColorCipher(data);
                 break;
             default:
                 configureTextPuzzle(data);
@@ -683,6 +693,9 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (optionImages.length === 4) {
             optionsGrid.style.gridTemplateColumns = 'repeat(2, minmax(0, 1fr))';
         }
+        optionsGrid.style.columnGap = '40px';
+        optionsGrid.style.rowGap = '32px';
+        optionsGrid.style.justifyContent = 'center';
 
         optionImages.forEach((src, index) => {
             const option = document.createElement('div');
@@ -744,6 +757,72 @@ document.addEventListener('DOMContentLoaded', () => {
 
         squiggleSelectedIndex = index;
         optionElement.classList.add('active');
+    }
+
+    function setupColorCipher(data) {
+        const revealDuration = Number.parseInt(data.reveal_duration, 10);
+        const revealSeconds = Number.isFinite(revealDuration) && revealDuration > 0 ? revealDuration : 3;
+
+        if (inputGroup) {
+            inputGroup.style.display = 'none';
+        }
+
+        submitBtn.style.display = 'block';
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submit';
+
+        userAnswerInput.type = data.input_mode === 'text' ? 'text' : 'number';
+        userAnswerInput.value = '';
+        userAnswerInput.placeholder = 'Enter answer';
+
+        const previewWrapper = document.createElement('div');
+        previewWrapper.className = 'color-cipher-preview';
+
+        const previewTitle = document.createElement('div');
+        previewTitle.className = 'color-cipher-title';
+        previewTitle.textContent = 'Remember these values:';
+        previewWrapper.appendChild(previewTitle);
+
+        const mappingList = document.createElement('div');
+        mappingList.className = 'color-cipher-mapping';
+
+        (data.mapping || []).forEach((item) => {
+            const row = document.createElement('div');
+            row.className = 'color-cipher-row';
+
+            const symbol = document.createElement('span');
+            symbol.className = 'color-cipher-symbol';
+            symbol.textContent = item.symbol || '';
+
+            const value = document.createElement('span');
+            value.className = 'color-cipher-value';
+            value.textContent = `= ${item.value}`;
+
+            row.appendChild(symbol);
+            row.appendChild(value);
+            mappingList.appendChild(row);
+        });
+
+        previewWrapper.appendChild(mappingList);
+        puzzleImageContainer.appendChild(previewWrapper);
+
+        const questionBlock = document.createElement('div');
+        questionBlock.className = 'color-cipher-question';
+        questionBlock.textContent = '';
+        questionBlock.style.display = 'none';
+        puzzleImageContainer.appendChild(questionBlock);
+
+        colorCipherRevealTimeout = setTimeout(() => {
+            previewWrapper.remove();
+            if (inputGroup) {
+                inputGroup.style.display = 'flex';
+            }
+            submitBtn.disabled = false;
+            // questionBlock.textContent = data.question || 'What is the answer?';
+            questionBlock.style.display = 'block';
+            puzzlePrompt.textContent = data.question || 'What is the answer?';
+            userAnswerInput.focus();
+        }, revealSeconds * 1000);
     }
 
     function selectDeformationOption(index, cellElement) {
@@ -871,6 +950,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
                 break;
+            case 'color_cipher':
+                if (!userAnswerInput.value.trim()) {
+                    showError('Enter your answer before submitting.');
+                    resetCustomSubmitButtons();
+                    return;
+                }
+                answerData.answer = userAnswerInput.value.trim();
+                if (currentPuzzle.cipher_state) {
+                    answerData.cipher_state = currentPuzzle.cipher_state;
+                }
+                break;
             default:
                 answerData.answer = userAnswerInput.value.trim();
                 break;
@@ -996,7 +1086,8 @@ document.addEventListener('DOMContentLoaded', () => {
             Shadow_Plausible: 4,
             Mirror: 4,
             Deformation: 4,
-            Squiggle: 4
+            Squiggle: 4,
+            Color_Cipher: 3
         };
 
         const difficulty = difficultyRatings[puzzleType] || 1;

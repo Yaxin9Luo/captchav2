@@ -1,6 +1,7 @@
 import os
 import json
 import random
+import uuid
 from flask import Flask, render_template, request, jsonify, send_from_directory
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
@@ -17,10 +18,138 @@ PUZZLE_TYPE_SEQUENCE = [
     # 'Bingo',
     # 'Shadow_Plausible',
     # 'Mirror',
-    # 'Deformation'
-    'Squiggle'
+    # 'Deformation',
+    # 'Squiggle',
+    'Color_Cipher'
 ]
 sequential_index = 0
+
+COLOR_SYMBOL_POOL = [
+    ("🟥", "red"),
+    ("🟧", "orange"),
+    ("🟨", "yellow"),
+    ("🟩", "green"),
+    ("🟦", "blue"),
+    ("🟪", "purple"),
+    ("⬛", "black"),
+    ("⬜", "white"),
+]
+
+
+def generate_color_cipher(config: dict) -> dict:
+    """Create a unique Color Cipher puzzle definition."""
+    symbol_count = config.get("symbol_count", 3)
+    symbol_count = max(2, min(symbol_count, len(COLOR_SYMBOL_POOL)))
+
+    # Pick distinct symbols and values
+    selected_symbols = random.sample(COLOR_SYMBOL_POOL, symbol_count)
+    low, high = config.get("value_range", [1, 12])
+    value_pool = list(range(int(low), int(high) + 1))
+    if len(value_pool) < symbol_count:
+        value_pool = list(range(1, symbol_count + 5))
+    values = random.sample(value_pool, symbol_count)
+
+    mapping = []
+    for (symbol, label), value in zip(selected_symbols, values):
+        mapping.append({
+            "symbol": symbol,
+            "value": value,
+            "label": label
+        })
+
+    term_count = 2 if symbol_count < 3 else random.choice([2, 3])
+    operands = random.sample(mapping, term_count)
+    available_ops = config.get("operations", ["+", "-"])
+    if not available_ops:
+        available_ops = ["+"]
+    operations = [random.choice(available_ops) for _ in range(term_count - 1)]
+
+    expression_parts = [operands[0]["symbol"]]
+    total = operands[0]["value"]
+    for op, operand in zip(operations, operands[1:]):
+        expression_parts.extend([op, operand["symbol"]])
+        if op == "+":
+            total += operand["value"]
+        elif op == "-":
+            total -= operand["value"]
+        elif op == "*":
+            total *= operand["value"]
+        else:
+            total += operand["value"]
+
+    expression = " ".join(expression_parts)
+    question_template = config.get("question_template", "What is {expression}?")
+
+    puzzle_id = f"color_cipher_{uuid.uuid4().hex}"
+    cipher_state = {
+        "mapping": mapping,
+        "expression": expression
+    }
+    return {
+        "puzzle_id": puzzle_id,
+        "mapping": mapping,
+        "question": question_template.format(expression=expression),
+        "answer": total,
+        "reveal_duration": config.get("reveal_duration", 3),
+        "input_mode": config.get("input_type", "number"),
+        "prompt": config.get(
+            "prompt",
+            "Keys flash briefly, then vanish. Remember the mapping before it disappears."
+        ),
+        "debug_expression": expression,
+        "cipher_state": cipher_state
+    }
+
+
+def evaluate_color_cipher(expression: str, mapping: list[dict]) -> float:
+    """Compute the numeric result of a color cipher expression."""
+    if not expression or not mapping:
+        raise ValueError('Missing expression or mapping')
+
+    symbol_map = {}
+    for entry in mapping:
+        symbol = entry.get('symbol')
+        value = entry.get('value')
+        if symbol is None or value is None:
+            continue
+        symbol_map[str(symbol)] = float(value)
+
+    tokens = expression.split()
+    if not tokens:
+        raise ValueError('Empty expression')
+
+    try:
+        result = symbol_map[tokens[0]]
+    except KeyError as exc:
+        raise ValueError(f'Unknown symbol {tokens[0]}') from exc
+
+    idx = 1
+    while idx < len(tokens):
+        op = tokens[idx]
+        if idx + 1 >= len(tokens):
+            raise ValueError('Malformed expression')
+        symbol = tokens[idx + 1]
+        if symbol not in symbol_map:
+            raise ValueError(f'Unknown symbol {symbol}')
+        value = symbol_map[symbol]
+
+        if op == '+':
+            result += value
+        elif op == '-':
+            result -= value
+        elif op == '*':
+            result *= value
+        elif op == '/':
+            if value == 0:
+                raise ValueError('Division by zero')
+            result /= value
+        else:
+            raise ValueError(f'Unsupported operator {op}')
+
+        idx += 2
+
+    return result
+
 
 # Load ground truth data for a specific type
 def load_ground_truth(captcha_type):
@@ -98,6 +227,24 @@ def get_puzzle():
     
     # Load ground truth for the selected type
     ground_truth = load_ground_truth(puzzle_type)
+    if puzzle_type == "Color_Cipher":
+        config = ground_truth.get("config", {})
+        cipher = generate_color_cipher(config)
+        response_data = {
+            'puzzle_type': puzzle_type,
+            'image_path': None,
+            'puzzle_id': cipher["puzzle_id"],
+            'prompt': cipher["prompt"],
+            'input_type': 'color_cipher',
+            'debug_info': f"Type: {puzzle_type}, Input: color_cipher, Expression: {cipher['debug_expression']}",
+            'mapping': cipher["mapping"],
+            'question': cipher["question"],
+            'reveal_duration': cipher["reveal_duration"],
+            'input_mode': cipher["input_mode"],
+            'cipher_state': cipher["cipher_state"]
+        }
+        return jsonify(response_data)
+
     if not ground_truth:
         return jsonify({'error': f'No puzzles found for type: {puzzle_type}'}), 404
     
@@ -158,6 +305,8 @@ def get_puzzle():
         input_type = "deformation_select"
     elif puzzle_type == "Squiggle":
         input_type = "squiggle_select"
+    elif puzzle_type == "Color_Cipher":
+        input_type = "color_cipher"
 
     
     # For Rotation_Match, include additional data needed for the interface
@@ -220,12 +369,11 @@ def get_puzzle():
             "reveal_duration": ground_truth[selected_puzzle].get("reveal_duration", 3),
             "grid_size": ground_truth[selected_puzzle].get("grid_size")
         }
-
     else:
         prompt = ground_truth[selected_puzzle].get("prompt", "Solve the CAPTCHA puzzle")
 
     image_path = None
-    if puzzle_type not in ("Rotation_Match", "Shadow_Plausible", "Mirror", "Deformation", "Squiggle"):
+    if puzzle_type not in ("Rotation_Match", "Shadow_Plausible", "Mirror", "Deformation", "Squiggle", "Color_Cipher"):
         image_path = f'/captcha_data/{puzzle_type}/{selected_puzzle}'
 
     response_data = {
@@ -255,10 +403,12 @@ def get_ground_truth():
     
     ground_truth = load_ground_truth(puzzle_type)
     
+    if puzzle_type == 'Color_Cipher':
+        return jsonify({'error': 'Ground truth is generated dynamically for Color_Cipher puzzles'}), 400
+    
     if puzzle_id not in ground_truth:
         return jsonify({'error': 'Invalid puzzle ID'}), 400
     
-    # Return the ground truth for the specified puzzle
     puzzle_data = ground_truth[puzzle_id]
     
     return jsonify({
@@ -282,11 +432,12 @@ def check_answer():
     
     ground_truth = load_ground_truth(puzzle_type)
     
-    if puzzle_id not in ground_truth:
+    if puzzle_type != 'Color_Cipher' and puzzle_id not in ground_truth:
         return jsonify({'error': 'Invalid puzzle ID'}), 400
     
     # Get correct answer based on puzzle type
     is_correct = False
+    correct_answer_info = None
             
     
     if puzzle_type == 'Bingo':
@@ -350,6 +501,19 @@ def check_answer():
             correct_answer_info = correct_index
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid answer format for Squiggle'}), 400
+    elif puzzle_type == 'Color_Cipher':
+        cipher_state = data.get('cipher_state') or {}
+        mapping = cipher_state.get('mapping') or []
+        expression = cipher_state.get('expression')
+        if not mapping or not expression:
+            return jsonify({'error': 'Missing color cipher state'}), 400
+        try:
+            correct_value = evaluate_color_cipher(expression, mapping)
+            user_value = float(user_answer)
+            is_correct = abs(user_value - float(correct_value)) < 1e-6
+            correct_answer_info = correct_value
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid answer format for Color_Cipher'}), 400
     else:
         # For other types, compare as strings (case insensitive)
         correct_answer = ground_truth[puzzle_id].get('answer')
@@ -361,11 +525,18 @@ def check_answer():
         answer_key = 'sum'
     else:
         answer_key = 'answer'
-    
+    if puzzle_type == 'Color_Cipher':
+        correct_value = correct_answer_info
+        if isinstance(correct_value, float) and abs(correct_value - round(correct_value)) < 1e-6:
+            correct_value = int(round(correct_value))
+        correct_payload = correct_value
+    else:
+        correct_payload = ground_truth[puzzle_id].get(answer_key)
+
     return jsonify({
         'correct': is_correct,
         'user_answer': user_answer,
-        'correct_answer': ground_truth[puzzle_id].get(answer_key)
+        'correct_answer': correct_payload
     })
 
 @app.route('/api/benchmark_results', methods=['POST'])

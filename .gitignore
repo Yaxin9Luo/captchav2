@@ -7,10 +7,9 @@ full-videos/
 30fps_videos/
 inflevel_lab.tar.gz
 *.log
-./benchmark_results.json
+benchmark_results.json
 *.DS_Store
 .env
 .venv/
-*.json
 extract_frames.py
 extracted_frames/

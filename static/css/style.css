@@ -684,11 +684,13 @@ h1 {
 
 .squiggle-options-grid {
     display: grid;
-    gap: 20px;
+    gap: 40px;
     width: 100%;
-    max-width: 720px;
+    max-width: 760px;
     margin: 0 auto;
+    padding: 0 20px;
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    justify-content: center;
 }
 
 .squiggle-option {
@@ -700,6 +702,8 @@ h1 {
     transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
     min-height: 240px;
     aspect-ratio: 4 / 3;
+    max-width: 360px;
+    margin: 0 auto;
 }
 
 .squiggle-option img {
@@ -755,13 +759,91 @@ h1 {
 @media (max-width: 600px) {
     .squiggle-options-grid {
         grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-        gap: 16px;
+        gap: 24px;
+        padding: 0 10px;
     }
 
     .squiggle-preview {
         padding: 16px;
     }
 }
+
+/* Color Cipher puzzle */
+.color-cipher-preview {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 20px;
+    background-color: #0f141b;
+    border: 2px solid #2c3e50;
+    border-radius: 10px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+    max-width: 520px;
+    margin: 0 auto;
+    color: #ecf0f1;
+    text-align: center;
+}
+
+.color-cipher-title {
+    font-weight: 600;
+    font-size: 18px;
+    letter-spacing: 0.03em;
+}
+
+.color-cipher-mapping {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+}
+
+.color-cipher-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    font-size: 28px;
+    font-weight: 600;
+    background-color: rgba(236, 240, 241, 0.08);
+    border-radius: 8px;
+    padding: 10px 16px;
+}
+
+.color-cipher-symbol {
+    font-size: 32px;
+}
+
+.color-cipher-value {
+    font-size: 24px;
+}
+
+.color-cipher-question {
+    margin-top: 20px;
+    font-size: 20px;
+    font-weight: 600;
+    color: #2c3e50;
+    text-align: center;
+}
+
+@media (max-width: 600px) {
+    .color-cipher-preview {
+        padding: 16px;
+    }
+
+    .color-cipher-row {
+        font-size: 24px;
+    }
+
+    .color-cipher-symbol {
+        font-size: 28px;
+    }
+
+    .color-cipher-value {
+        font-size: 20px;
+    }
+}
+
 .fireworks-container {
     position: fixed;
     top: 0;
