@@ -19,6 +19,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let shadowSelectedCells = [];
     let mirrorSelectedCells = [];
     let deformationSelectedIndex = null;
+    let squiggleSelectedIndex = null;
+    let squiggleRevealTimeout = null;
 
     submitBtn.addEventListener('click', submitAnswer);
     userAnswerInput.addEventListener('keypress', (event) => {
@@ -35,7 +37,11 @@ document.addEventListener('DOMContentLoaded', () => {
         shadowSelectedCells = [];
         mirrorSelectedCells = [];
         deformationSelectedIndex = null;
-        squiggleState = null;
+        squiggleSelectedIndex = null;
+        if (squiggleRevealTimeout) {
+            clearTimeout(squiggleRevealTimeout);
+            squiggleRevealTimeout = null;
+        }
 
         if (inputGroup) {
             inputGroup.style.display = 'flex';
@@ -70,8 +76,9 @@ document.addEventListener('DOMContentLoaded', () => {
             '.mirror-submit',
             '.deformation-layout',
             '.deformation-submit',
-            '.squiggle-container',
-            '.squiggle-controls'
+            '.squiggle-preview',
+            '.squiggle-options-grid',
+            '.squiggle-submit'
         ];
 
         customSelectors.forEach((selector) => {
@@ -112,8 +119,8 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'deformation_select':
                 setupDeformationSelect(data);
                 break;
-            case 'squiggle_draw':
-                setupSquiggleDraw(data);
+            case 'squiggle_select':
+                setupSquiggleSelect(data);
                 break;
             default:
                 configureTextPuzzle(data);
@@ -632,6 +639,113 @@ document.addEventListener('DOMContentLoaded', () => {
         puzzleImageContainer.appendChild(submitSection);
     }
 
+    function setupSquiggleSelect(data) {
+        if (inputGroup) {
+            inputGroup.style.display = 'none';
+        }
+        submitBtn.style.display = 'none';
+
+        squiggleSelectedIndex = null;
+
+        const optionImages = data.option_images || [];
+        if (!optionImages.length) {
+            showError('No squiggle options available.');
+            return;
+        }
+
+        const revealDuration = Number.parseInt(data.reveal_duration, 10);
+        const revealSeconds = Number.isFinite(revealDuration) && revealDuration > 0 ? revealDuration : 3;
+
+        const previewWrapper = document.createElement('div');
+        previewWrapper.className = 'squiggle-preview';
+
+        const previewHint = document.createElement('div');
+        previewHint.className = 'squiggle-hint';
+        previewHint.textContent = `Memorize the trace. Choices appear in ${revealSeconds} second${revealSeconds === 1 ? '' : 's'}.`;
+        previewWrapper.appendChild(previewHint);
+
+        const previewImage = document.createElement('img');
+        previewImage.src = data.reference_image;
+        previewImage.alt = 'Trace preview';
+        previewImage.draggable = false;
+        previewImage.className = 'squiggle-preview-image';
+        previewWrapper.appendChild(previewImage);
+
+        puzzleImageContainer.appendChild(previewWrapper);
+
+        const optionsGrid = document.createElement('div');
+        optionsGrid.className = 'squiggle-options-grid';
+        optionsGrid.style.display = 'none';
+
+        const gridSize = Array.isArray(data.grid_size) ? data.grid_size : null;
+        if (gridSize && gridSize.length > 1 && Number.isFinite(gridSize[1]) && gridSize[1] > 0) {
+            optionsGrid.style.gridTemplateColumns = `repeat(${gridSize[1]}, minmax(0, 1fr))`;
+        } else if (optionImages.length === 4) {
+            optionsGrid.style.gridTemplateColumns = 'repeat(2, minmax(0, 1fr))';
+        }
+
+        optionImages.forEach((src, index) => {
+            const option = document.createElement('div');
+            option.className = 'squiggle-option';
+            option.dataset.index = index;
+
+            const img = document.createElement('img');
+            img.src = src;
+            img.alt = `Squiggle option ${index + 1}`;
+            img.draggable = false;
+            option.appendChild(img);
+
+            option.addEventListener('click', () => selectSquiggleOption(index, option));
+
+            optionsGrid.appendChild(option);
+        });
+
+        puzzleImageContainer.appendChild(optionsGrid);
+
+        const submitSection = document.createElement('div');
+        submitSection.className = 'squiggle-submit';
+        submitSection.style.display = 'none';
+
+        const squiggleSubmitBtn = document.createElement('button');
+        squiggleSubmitBtn.className = 'submit-squiggle';
+        squiggleSubmitBtn.type = 'button';
+        squiggleSubmitBtn.textContent = 'Submit';
+        squiggleSubmitBtn.addEventListener('click', () => {
+            if (squiggleSelectedIndex === null) {
+                showError('Select the squiggle that matches the preview.');
+                return;
+            }
+            squiggleSubmitBtn.disabled = true;
+            squiggleSubmitBtn.textContent = 'Processing...';
+            submitAnswer();
+        });
+
+        submitSection.appendChild(squiggleSubmitBtn);
+        puzzleImageContainer.appendChild(submitSection);
+
+        squiggleRevealTimeout = setTimeout(() => {
+            previewWrapper.remove();
+            optionsGrid.style.display = 'grid';
+            submitSection.style.display = 'flex';
+        }, revealSeconds * 1000);
+    }
+
+    function selectSquiggleOption(index, optionElement) {
+        if (squiggleSelectedIndex === index) {
+            squiggleSelectedIndex = null;
+            optionElement.classList.remove('active');
+            return;
+        }
+
+        const previouslyActive = document.querySelector('.squiggle-option.active');
+        if (previouslyActive) {
+            previouslyActive.classList.remove('active');
+        }
+
+        squiggleSelectedIndex = index;
+        optionElement.classList.add('active');
+    }
+
     function selectDeformationOption(index, cellElement) {
         if (deformationSelectedIndex === index) {
             deformationSelectedIndex = null;
@@ -749,6 +863,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
                 break;
+            case 'squiggle_select':
+                answerData.answer = squiggleSelectedIndex;
+                if (squiggleSelectedIndex === null) {
+                    showError('Select the squiggle that matches the preview.');
+                    resetCustomSubmitButtons();
+                    return;
+                }
+                break;
             default:
                 answerData.answer = userAnswerInput.value.trim();
                 break;
@@ -832,6 +954,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (deformationButton) {
             deformationButton.disabled = false;
             deformationButton.textContent = 'Submit';
+        }
+
+        const squiggleButton = document.querySelector('.submit-squiggle');
+        if (squiggleButton) {
+            squiggleButton.disabled = false;
+            squiggleButton.textContent = 'Submit';
         }
     }
 

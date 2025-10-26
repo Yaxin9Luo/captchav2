@@ -13,11 +13,12 @@ recent_types = []
 MAX_RECENT_TYPES = 5
 
 PUZZLE_TYPE_SEQUENCE = [
-    'Dice_Count',
-    'Bingo',
-    'Shadow_Plausible',
-    'Mirror',
-    'Deformation'
+    # 'Dice_Count',
+    # 'Bingo',
+    # 'Shadow_Plausible',
+    # 'Mirror',
+    # 'Deformation'
+    'Squiggle'
 ]
 sequential_index = 0
 
@@ -155,6 +156,8 @@ def get_puzzle():
         input_type = "mirror_select"
     elif puzzle_type == "Deformation":
         input_type = "deformation_select"
+    elif puzzle_type == "Squiggle":
+        input_type = "squiggle_select"
 
     
     # For Rotation_Match, include additional data needed for the interface
@@ -182,6 +185,16 @@ def get_puzzle():
             "grid_size": ground_truth[selected_puzzle].get("grid_size", [1, len(option_images)]),
             "answer": ground_truth[selected_puzzle].get("answer", [])
         }
+    elif puzzle_type == "Shadow_Plausible":
+        option_images = ground_truth[selected_puzzle].get("options", [])
+        if not option_images:
+            return jsonify({'error': f'Invalid shadow data: {selected_puzzle}'}), 500
+
+        additional_data = {
+            "option_images": [f'/captcha_data/{puzzle_type}/{img}' for img in option_images],
+            "grid_size": ground_truth[selected_puzzle].get("grid_size", []),
+            "answer": ground_truth[selected_puzzle].get("answer", [])
+        }
     elif puzzle_type == "Deformation":
         reference_image = ground_truth[selected_puzzle].get("reference")
         option_images = ground_truth[selected_puzzle].get("options", [])
@@ -196,17 +209,16 @@ def get_puzzle():
         }
     elif puzzle_type == "Squiggle":
         reference_image = ground_truth[selected_puzzle].get("reference")
-        if not reference_image:
+        option_images = ground_truth[selected_puzzle].get("options", [])
+        if not reference_image or not option_images:
             return jsonify({'error': f'Invalid squiggle data: {selected_puzzle}'}), 500
 
         additional_data = {
             "reference_image": f'/captcha_data/{puzzle_type}/{reference_image}',
-            "min_path_length": ground_truth[selected_puzzle].get("min_length", 200),
-            "min_accuracy": ground_truth[selected_puzzle].get("min_accuracy", 0.6),
-            "min_shape_coverage": ground_truth[selected_puzzle].get("min_shape_coverage", 0.0),
-            "ink_threshold": ground_truth[selected_puzzle].get("ink_threshold", 180),
-            "sample_step": ground_truth[selected_puzzle].get("sample_step", 3),
-            "answer": ground_truth[selected_puzzle].get("answer", {})
+            "option_images": [f'/captcha_data/{puzzle_type}/{img}' for img in option_images],
+            "answer": ground_truth[selected_puzzle].get("answer"),
+            "reveal_duration": ground_truth[selected_puzzle].get("reveal_duration", 3),
+            "grid_size": ground_truth[selected_puzzle].get("grid_size")
         }
 
     else:
@@ -330,6 +342,14 @@ def check_answer():
             correct_answer_info = correct_index
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid answer format for Deformation'}), 400
+    elif puzzle_type == 'Squiggle':
+        try:
+            correct_index = int(ground_truth[puzzle_id].get('answer'))
+            user_index = int(user_answer)
+            is_correct = user_index == correct_index
+            correct_answer_info = correct_index
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid answer format for Squiggle'}), 400
     else:
         # For other types, compare as strings (case insensitive)
         correct_answer = ground_truth[puzzle_id].get('answer')

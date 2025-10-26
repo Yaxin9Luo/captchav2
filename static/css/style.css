@@ -650,6 +650,118 @@ h1 {
         width: 100%;
     }
 }
+
+/* Squiggle memory puzzle */
+.squiggle-preview {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 18px;
+    background-color: #0f141b;
+    border: 2px solid #2c3e50;
+    border-radius: 10px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+    max-width: 560px;
+    margin: 0 auto;
+    text-align: center;
+}
+
+.squiggle-hint {
+    font-weight: 600;
+    font-size: 16px;
+    color: #f1c40f;
+    letter-spacing: 0.02em;
+}
+
+.squiggle-preview-image {
+    width: 100%;
+    max-height: 320px;
+    object-fit: contain;
+    border-radius: 8px;
+    background-color: #ffffff;
+}
+
+.squiggle-options-grid {
+    display: grid;
+    gap: 20px;
+    width: 100%;
+    max-width: 720px;
+    margin: 0 auto;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.squiggle-option {
+    border: 2px solid #2c3e50;
+    border-radius: 8px;
+    background-color: #0f141b;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    min-height: 240px;
+    aspect-ratio: 4 / 3;
+}
+
+.squiggle-option img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background-color: #ffffff;
+}
+
+.squiggle-option:hover {
+    transform: translateY(-2px);
+    border-color: #9b59b6;
+    box-shadow: 0 8px 20px rgba(155, 89, 182, 0.25);
+}
+
+.squiggle-option.active {
+    border-color: #9b59b6;
+    box-shadow: 0 10px 24px rgba(155, 89, 182, 0.35);
+}
+
+.squiggle-submit {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    margin-top: 12px;
+}
+
+.submit-squiggle {
+    padding: 14px 32px;
+    background-color: #9b59b6;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    font-size: 17px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 6px 16px rgba(155, 89, 182, 0.3);
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.submit-squiggle:hover {
+    background-color: #8e44ad;
+    transform: translateY(-1px);
+}
+
+.submit-squiggle:disabled {
+    background-color: #95a5a6;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+@media (max-width: 600px) {
+    .squiggle-options-grid {
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 16px;
+    }
+
+    .squiggle-preview {
+        padding: 16px;
+    }
+}
 .fireworks-container {
     position: fixed;
     top: 0;
