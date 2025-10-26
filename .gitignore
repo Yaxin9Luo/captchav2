@@ -12,3 +12,5 @@ inflevel_lab.tar.gz
 .env
 .venv/
 *.json
+extract_frames.py
+extracted_frames/

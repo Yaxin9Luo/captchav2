@@ -16,7 +16,8 @@ PUZZLE_TYPE_SEQUENCE = [
     'Dice_Count',
     'Bingo',
     'Shadow_Plausible',
-    'Mirror'
+    'Mirror',
+    'Deformation'
 ]
 sequential_index = 0
 
@@ -134,6 +135,11 @@ def get_puzzle():
             "prompt",
             "Select all mirror images that do not match the reference object."
         )
+    elif puzzle_type == "Deformation":
+        prompt = ground_truth[selected_puzzle].get(
+            "prompt",
+            "If I release the objects in the left image, choose the right image that shows the correct deformation."
+        )
     else:
         prompt = ground_truth[selected_puzzle].get("prompt", "Solve the CAPTCHA puzzle")
     
@@ -147,6 +153,8 @@ def get_puzzle():
         input_type = "shadow_plausible"
     elif puzzle_type == "Mirror":
         input_type = "mirror_select"
+    elif puzzle_type == "Deformation":
+        input_type = "deformation_select"
 
     
     # For Rotation_Match, include additional data needed for the interface
@@ -162,39 +170,6 @@ def get_puzzle():
             "solution_line": ground_truth[selected_puzzle].get("solution_line", {}),
             "answer": ground_truth[selected_puzzle].get("answer", [])
         }
-    # For Dart_Count, include the reference image and options
-    elif puzzle_type == "Dart_Count":
-        # Get the reference image and option images
-        reference_image = ground_truth[selected_puzzle].get("reference_image")
-        option_images = ground_truth[selected_puzzle].get("option_images", [])
-        correct_option_index = ground_truth[selected_puzzle].get("correct_option_index", 0)
-        reference_number = ground_truth[selected_puzzle].get("reference_number", 0)
-        
-        if not reference_image or not option_images:
-            return jsonify({'error': f'Invalid dart count data: {selected_puzzle}'}), 500
-        
-        # Format paths for these images
-        ref_path = f'/captcha_data/{puzzle_type}/{reference_image}'
-        option_paths = [f'/captcha_data/{puzzle_type}/{img}' for img in option_images]
-        
-        additional_data = {
-            "reference_image": ref_path,
-            "option_images": option_paths,
-            "current_option_index": 0,
-            "correct_option_index": correct_option_index,
-            "reference_number": reference_number
-        }
-    elif puzzle_type == "Shadow_Plausible":
-        option_images = ground_truth[selected_puzzle].get("options", [])
-        if not option_images:
-            return jsonify({'error': f'Invalid shadow plausible data: {selected_puzzle}'}), 500
-
-        grid_size = ground_truth[selected_puzzle].get("grid_size", [2, 4])
-        additional_data = {
-            "option_images": [f'/captcha_data/{puzzle_type}/{img}' for img in option_images],
-            "grid_size": grid_size,
-            "answer": ground_truth[selected_puzzle].get("answer", [])
-        }
     elif puzzle_type == "Mirror":
         reference_image = ground_truth[selected_puzzle].get("reference")
         option_images = ground_truth[selected_puzzle].get("options", [])
@@ -207,12 +182,38 @@ def get_puzzle():
             "grid_size": ground_truth[selected_puzzle].get("grid_size", [1, len(option_images)]),
             "answer": ground_truth[selected_puzzle].get("answer", [])
         }
-    
+    elif puzzle_type == "Deformation":
+        reference_image = ground_truth[selected_puzzle].get("reference")
+        option_images = ground_truth[selected_puzzle].get("options", [])
+        if not reference_image or not option_images:
+            return jsonify({'error': f'Invalid deformation data: {selected_puzzle}'}), 500
+
+        additional_data = {
+            "reference_image": f'/captcha_data/{puzzle_type}/{reference_image}',
+            "option_images": [f'/captcha_data/{puzzle_type}/{img}' for img in option_images],
+            "grid_size": ground_truth[selected_puzzle].get("grid_size", [2, 2]),
+            "answer": ground_truth[selected_puzzle].get("answer")
+        }
+    elif puzzle_type == "Squiggle":
+        reference_image = ground_truth[selected_puzzle].get("reference")
+        if not reference_image:
+            return jsonify({'error': f'Invalid squiggle data: {selected_puzzle}'}), 500
+
+        additional_data = {
+            "reference_image": f'/captcha_data/{puzzle_type}/{reference_image}',
+            "min_path_length": ground_truth[selected_puzzle].get("min_length", 200),
+            "min_accuracy": ground_truth[selected_puzzle].get("min_accuracy", 0.6),
+            "min_shape_coverage": ground_truth[selected_puzzle].get("min_shape_coverage", 0.0),
+            "ink_threshold": ground_truth[selected_puzzle].get("ink_threshold", 180),
+            "sample_step": ground_truth[selected_puzzle].get("sample_step", 3),
+            "answer": ground_truth[selected_puzzle].get("answer", {})
+        }
+
     else:
         prompt = ground_truth[selected_puzzle].get("prompt", "Solve the CAPTCHA puzzle")
-    
+
     image_path = None
-    if puzzle_type not in ("Rotation_Match", "Shadow_Plausible", "Mirror"):
+    if puzzle_type not in ("Rotation_Match", "Shadow_Plausible", "Mirror", "Deformation", "Squiggle"):
         image_path = f'/captcha_data/{puzzle_type}/{selected_puzzle}'
 
     response_data = {
@@ -227,7 +228,7 @@ def get_puzzle():
     # Add any additional data for specific puzzle types
     if additional_data:
         response_data.update(additional_data)
-    
+
     return jsonify(response_data)
 
 @app.route('/api/get_ground_truth', methods=['POST'])
@@ -321,22 +322,14 @@ def check_answer():
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid answer format for Mirror'}), 400
 
-    elif puzzle_type == 'Dart_Count':
-        # For Dart_Count, check if the selected option index matches the correct one
+    elif puzzle_type == 'Deformation':
         try:
-            # Get the correct option index from ground truth
-            correct_index = ground_truth[puzzle_id].get('correct_option_index')
-            
-            # User answer should be the selected option index
+            correct_index = int(ground_truth[puzzle_id].get('answer'))
             user_index = int(user_answer)
-            
-            # Check if indices match
             is_correct = user_index == correct_index
             correct_answer_info = correct_index
         except (ValueError, TypeError):
-            return jsonify({'error': 'Invalid answer format for Dart_Count'}), 400
-    
-    
+            return jsonify({'error': 'Invalid answer format for Deformation'}), 400
     else:
         # For other types, compare as strings (case insensitive)
         correct_answer = ground_truth[puzzle_id].get('answer')
@@ -346,14 +339,6 @@ def check_answer():
     # Get the appropriate answer field based on puzzle type
     if puzzle_type == 'Dice_Count':
         answer_key = 'sum'
-    elif puzzle_type == 'Coordinates':
-        answer_key = 'correct_option_index'
-    elif puzzle_type == 'Path_Finder':
-        answer_key = 'correct_option'
-    elif puzzle_type == 'Connect_icon':
-        answer_key = 'correct_option'
-    elif puzzle_type == 'Click_Order':
-        answer_key = 'answer'
     else:
         answer_key = 'answer'
     

@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let bingoSelectedCells = [];
     let shadowSelectedCells = [];
     let mirrorSelectedCells = [];
+    let deformationSelectedIndex = null;
 
     submitBtn.addEventListener('click', submitAnswer);
     userAnswerInput.addEventListener('keypress', (event) => {
@@ -33,6 +34,8 @@ document.addEventListener('DOMContentLoaded', () => {
         bingoSelectedCells = [];
         shadowSelectedCells = [];
         mirrorSelectedCells = [];
+        deformationSelectedIndex = null;
+        squiggleState = null;
 
         if (inputGroup) {
             inputGroup.style.display = 'flex';
@@ -64,7 +67,11 @@ document.addEventListener('DOMContentLoaded', () => {
             '.shadow-plausible-grid',
             '.shadow-submit',
             '.mirror-layout',
-            '.mirror-submit'
+            '.mirror-submit',
+            '.deformation-layout',
+            '.deformation-submit',
+            '.squiggle-container',
+            '.squiggle-controls'
         ];
 
         customSelectors.forEach((selector) => {
@@ -98,14 +105,20 @@ document.addEventListener('DOMContentLoaded', () => {
                         break;
                     case 'shadow_plausible':
                         setupShadowPlausibleGrid(data);
-                        break;
-                    case 'mirror_select':
-                        setupMirrorSelect(data);
-                        break;
-                    default:
-                        configureTextPuzzle(data);
-                        break;
-                }
+                break;
+            case 'mirror_select':
+                setupMirrorSelect(data);
+                break;
+            case 'deformation_select':
+                setupDeformationSelect(data);
+                break;
+            case 'squiggle_draw':
+                setupSquiggleDraw(data);
+                break;
+            default:
+                configureTextPuzzle(data);
+                break;
+        }
             })
             .catch((error) => {
                 console.error('Error loading puzzle:', error);
@@ -522,6 +535,142 @@ document.addEventListener('DOMContentLoaded', () => {
         puzzleImageContainer.appendChild(submitSection);
     }
 
+    function setupDeformationSelect(data) {
+        if (inputGroup) {
+            inputGroup.style.display = 'none';
+        }
+        submitBtn.style.display = 'none';
+
+        deformationSelectedIndex = null;
+
+        const layout = document.createElement('div');
+        layout.className = 'deformation-layout';
+
+        const referenceSection = document.createElement('div');
+        referenceSection.className = 'deformation-reference';
+
+        const referenceLabel = document.createElement('div');
+        referenceLabel.className = 'deformation-reference-label';
+        referenceLabel.textContent = 'Reference';
+        referenceSection.appendChild(referenceLabel);
+
+        const referenceImg = document.createElement('img');
+        referenceImg.src = data.reference_image;
+        referenceImg.alt = 'Reference deformation setup';
+        referenceImg.draggable = false;
+        referenceSection.appendChild(referenceImg);
+
+        const optionsSection = document.createElement('div');
+        optionsSection.className = 'deformation-options';
+
+        const optionsLabel = document.createElement('div');
+        optionsLabel.className = 'deformation-options-label';
+        optionsLabel.textContent = 'Select the correct deformation';
+        optionsSection.appendChild(optionsLabel);
+
+        const optionsGrid = document.createElement('div');
+        optionsGrid.className = 'deformation-options-grid';
+
+        const optionImages = data.option_images || [];
+        if (!optionImages.length) {
+            showError('No deformation options available.');
+            return;
+        }
+
+        const gridSize = data.grid_size || [2, Math.ceil(optionImages.length / 2)];
+        const cols = gridSize[1] || optionImages.length || 1;
+        optionsGrid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+
+        optionImages.forEach((src, index) => {
+            const cell = document.createElement('div');
+            cell.className = 'deformation-option';
+            cell.dataset.index = index;
+
+            const img = document.createElement('img');
+            img.src = src;
+            img.alt = `Deformation option ${index + 1}`;
+            img.draggable = false;
+            cell.appendChild(img);
+
+            const overlay = document.createElement('div');
+            overlay.className = 'deformation-overlay';
+            cell.appendChild(overlay);
+
+            const badge = document.createElement('div');
+            badge.className = 'deformation-checkmark';
+            badge.textContent = '✓';
+            cell.appendChild(badge);
+
+            cell.addEventListener('click', () => selectDeformationOption(index, cell));
+
+            optionsGrid.appendChild(cell);
+        });
+
+        optionsSection.appendChild(optionsGrid);
+        layout.appendChild(referenceSection);
+        layout.appendChild(optionsSection);
+        puzzleImageContainer.appendChild(layout);
+
+        const submitSection = document.createElement('div');
+        submitSection.className = 'deformation-submit';
+
+        const deformationSubmitBtn = document.createElement('button');
+        deformationSubmitBtn.textContent = 'Submit';
+        deformationSubmitBtn.className = 'submit-deformation';
+        deformationSubmitBtn.type = 'button';
+        deformationSubmitBtn.addEventListener('click', () => {
+            if (deformationSelectedIndex === null) {
+                showError('Select one deformation before submitting.');
+                return;
+            }
+            deformationSubmitBtn.disabled = true;
+            deformationSubmitBtn.textContent = 'Processing...';
+            submitAnswer();
+        });
+
+        submitSection.appendChild(deformationSubmitBtn);
+        puzzleImageContainer.appendChild(submitSection);
+    }
+
+    function selectDeformationOption(index, cellElement) {
+        if (deformationSelectedIndex === index) {
+            deformationSelectedIndex = null;
+            const overlay = cellElement.querySelector('.deformation-overlay');
+            const badge = cellElement.querySelector('.deformation-checkmark');
+            if (overlay) {
+                overlay.classList.remove('active');
+            }
+            if (badge) {
+                badge.classList.remove('active');
+            }
+            cellElement.classList.remove('active');
+            return;
+        }
+
+        const previouslyActive = document.querySelector('.deformation-option.active');
+        if (previouslyActive) {
+            previouslyActive.classList.remove('active');
+            const previousOverlay = previouslyActive.querySelector('.deformation-overlay');
+            const previousBadge = previouslyActive.querySelector('.deformation-checkmark');
+            if (previousOverlay) {
+                previousOverlay.classList.remove('active');
+            }
+            if (previousBadge) {
+                previousBadge.classList.remove('active');
+            }
+        }
+
+        deformationSelectedIndex = index;
+        const overlay = cellElement.querySelector('.deformation-overlay');
+        const badge = cellElement.querySelector('.deformation-checkmark');
+        if (overlay) {
+            overlay.classList.add('active');
+        }
+        if (badge) {
+            badge.classList.add('active');
+        }
+        cellElement.classList.add('active');
+    }
     function toggleMirrorSelection(index, cellElement) {
         const overlay = cellElement.querySelector('.mirror-overlay');
         const badge = cellElement.querySelector('.mirror-checkmark');
@@ -588,6 +737,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 answerData.answer = mirrorSelectedCells;
                 if (!mirrorSelectedCells.length) {
                     showError('Select at least one mirror before submitting.');
+                    resetCustomSubmitButtons();
+                    return;
+                }
+                break;
+            case 'deformation_select':
+                answerData.answer = deformationSelectedIndex;
+                if (deformationSelectedIndex === null) {
+                    showError('Select one deformation before submitting.');
                     resetCustomSubmitButtons();
                     return;
                 }
@@ -670,6 +827,12 @@ document.addEventListener('DOMContentLoaded', () => {
             mirrorButton.disabled = false;
             mirrorButton.textContent = 'Submit';
         }
+
+        const deformationButton = document.querySelector('.submit-deformation');
+        if (deformationButton) {
+            deformationButton.disabled = false;
+            deformationButton.textContent = 'Submit';
+        }
     }
 
     function updateStats() {
@@ -703,7 +866,9 @@ document.addEventListener('DOMContentLoaded', () => {
             Dice_Count: 3,
             Bingo: 3,
             Shadow_Plausible: 4,
-            Mirror: 4
+            Mirror: 4,
+            Deformation: 4,
+            Squiggle: 4
         };
 
         const difficulty = difficultyRatings[puzzleType] || 1;
