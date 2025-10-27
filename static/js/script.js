@@ -22,6 +22,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let squiggleSelectedIndex = null;
     let squiggleRevealTimeout = null;
     let colorCipherRevealTimeout = null;
+    let redDotTimeout = null;
+    let redDotAnswered = false;
+    let redDotHits = 0;
+    let redDotRequiredHits = 0;
+    let redDotTimeoutDuration = 2000;
+    let redDotElement = null;
 
     submitBtn.addEventListener('click', submitAnswer);
     userAnswerInput.addEventListener('keypress', (event) => {
@@ -47,6 +53,15 @@ document.addEventListener('DOMContentLoaded', () => {
             clearTimeout(colorCipherRevealTimeout);
             colorCipherRevealTimeout = null;
         }
+        if (redDotTimeout) {
+            clearTimeout(redDotTimeout);
+            redDotTimeout = null;
+        }
+        redDotAnswered = false;
+        redDotHits = 0;
+        redDotRequiredHits = 0;
+        redDotTimeoutDuration = 2000;
+        redDotElement = null;
 
         if (inputGroup) {
             inputGroup.style.display = 'flex';
@@ -71,6 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
         puzzleImageContainer.style.margin = '';
 
         puzzleImage.style.display = 'none';
+        puzzleImage.src = '';
 
         const customSelectors = [
             '.bingo-grid',
@@ -85,12 +101,123 @@ document.addEventListener('DOMContentLoaded', () => {
             '.squiggle-options-grid',
             '.squiggle-submit',
             '.color-cipher-preview',
-            '.color-cipher-question'
+            '.color-cipher-question',
+            '.red-dot-area'
         ];
 
         customSelectors.forEach((selector) => {
             document.querySelectorAll(selector).forEach((element) => element.remove());
         });
+    }
+
+    function submitRedDotAttempt(redDotAnswer) {
+        if (!currentPuzzle || currentPuzzle.input_type !== 'red_dot_click') {
+            return;
+        }
+
+        const answerData = {
+            puzzle_type: currentPuzzle.puzzle_type,
+            puzzle_id: currentPuzzle.puzzle_id,
+            answer: redDotAnswer
+        };
+        answerData.elapsed_time = ((Date.now() - (puzzleStartTime || Date.now())) / 1000).toFixed(2);
+
+        fetch('/api/check_answer', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(answerData)
+        })
+            .then((response) => response.json())
+            .then((data) => {
+                if (data.status === 'continue') {
+                    redDotHits = Number.isFinite(data.hits_completed) ? data.hits_completed : redDotHits;
+                    redDotRequiredHits = Number.isFinite(data.required_hits) ? data.required_hits : redDotRequiredHits;
+                    redDotTimeoutDuration = Number.isFinite(data.timeout_ms) ? data.timeout_ms : redDotTimeoutDuration;
+
+                    const nextDot = data.next_dot || {};
+                    currentPuzzle.dot = nextDot;
+                    currentPuzzle.timeout_ms = redDotTimeoutDuration;
+                    currentPuzzle.required_hits = redDotRequiredHits;
+                    currentPuzzle.hits_completed = redDotHits;
+                    if (redDotElement) {
+                        if (Number.isFinite(nextDot.diameter)) {
+                            redDotElement.style.width = `${nextDot.diameter}px`;
+                            redDotElement.style.height = `${nextDot.diameter}px`;
+                        }
+                        if (Number.isFinite(nextDot.x)) {
+                            redDotElement.style.left = `${nextDot.x}px`;
+                        }
+                        if (Number.isFinite(nextDot.y)) {
+                            redDotElement.style.top = `${nextDot.y}px`;
+                        }
+                        redDotElement.classList.remove('red-dot-hidden');
+                    }
+
+                    redDotAnswered = false;
+                    displayRedDotProgress();
+                    scheduleRedDotTimeout(redDotTimeoutDuration);
+                    return;
+                }
+
+                benchmarkStats.total += 1;
+
+                if (data.correct) {
+                    benchmarkStats.correct += 1;
+                    redDotHits = redDotRequiredHits;
+                    resultMessage.textContent = 'Correct!';
+                    resultMessage.className = 'result-message correct';
+                    createFireworks();
+                } else {
+                    const failureMessage = data.message || 'Incorrect.';
+                    resultMessage.textContent = failureMessage;
+                    resultMessage.className = 'result-message incorrect';
+                    createSadFace();
+                }
+
+                updateStats();
+                recordBenchmarkResult({
+                    puzzle_type: currentPuzzle.puzzle_type,
+                    puzzle_id: currentPuzzle.puzzle_id,
+                    user_answer: redDotAnswer,
+                    correct_answer: data.correct_answer,
+                    correct: data.correct,
+                    elapsed_time: answerData.elapsed_time
+                });
+
+                setTimeout(loadNewPuzzle, 2000);
+            })
+            .catch((error) => {
+                console.error('Error checking red dot answer:', error);
+                showError('Error checking answer. Please try again.');
+            });
+    }
+
+    function renderPuzzleMedia(data) {
+        const mediaPath = data.media_path || data.image_path;
+        if (!mediaPath) {
+            return;
+        }
+
+        const mediaType = (data.media_type || 'image').toLowerCase();
+        if (mediaType === 'video') {
+            const video = document.createElement('video');
+            video.className = 'puzzle-video';
+            video.src = mediaPath;
+            video.autoplay = true;
+            video.loop = true;
+            video.muted = true;
+            video.playsInline = true;
+            video.controls = true;
+            video.setAttribute('preload', 'auto');
+            puzzleImageContainer.appendChild(video);
+        } else {
+            puzzleImage.src = mediaPath;
+            puzzleImage.alt = data.media_alt || data.prompt || 'CAPTCHA Puzzle';
+            puzzleImage.style.display = 'block';
+            puzzleImageContainer.appendChild(puzzleImage);
+        }
     }
 
     function loadNewPuzzle() {
@@ -132,6 +259,9 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'color_cipher':
                 setupColorCipher(data);
                 break;
+            case 'red_dot_click':
+                setupRedDotClick(data);
+                break;
             default:
                 configureTextPuzzle(data);
                 break;
@@ -141,6 +271,93 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error('Error loading puzzle:', error);
                 showError('Unable to load a new puzzle. Please refresh the page.');
             });
+    }
+
+    function setupRedDotClick(data) {
+        if (inputGroup) {
+            inputGroup.style.display = 'none';
+        }
+        submitBtn.style.display = 'none';
+
+        redDotAnswered = false;
+        redDotHits = Number.isFinite(data?.hits_completed) ? data.hits_completed : 0;
+        redDotRequiredHits = Number.isFinite(data?.required_hits) ? data.required_hits : 1;
+
+        const areaWidth = Number.isFinite(data?.area?.width) ? data.area.width : 420;
+        const areaHeight = Number.isFinite(data?.area?.height) ? data.area.height : 320;
+        const dotDiameter = Number.isFinite(data?.dot?.diameter) ? data.dot.diameter : 48;
+        const dotX = Number.isFinite(data?.dot?.x) ? data.dot.x : (areaWidth - dotDiameter) / 2;
+        const dotY = Number.isFinite(data?.dot?.y) ? data.dot.y : (areaHeight - dotDiameter) / 2;
+        const timeoutMs = Number.isFinite(data?.timeout_ms) ? data.timeout_ms : 2000;
+        redDotTimeoutDuration = timeoutMs;
+
+        const area = document.createElement('div');
+        area.className = 'red-dot-area';
+        area.style.width = `${areaWidth}px`;
+        area.style.height = `${areaHeight}px`;
+
+        const dot = document.createElement('div');
+        dot.className = 'red-dot';
+        dot.style.width = `${dotDiameter}px`;
+        dot.style.height = `${dotDiameter}px`;
+        dot.style.left = `${dotX}px`;
+        dot.style.top = `${dotY}px`;
+
+        area.appendChild(dot);
+        puzzleImageContainer.appendChild(area);
+
+        redDotElement = dot;
+
+        const handleSuccessClick = (event) => {
+            if (redDotAnswered) {
+                return;
+            }
+            event.stopPropagation();
+            const areaRect = area.getBoundingClientRect();
+            const clickX = event.clientX - areaRect.left;
+            const clickY = event.clientY - areaRect.top;
+
+            finalizeRedDotAttempt({
+                clicked: true,
+                position: {
+                    x: Number.isFinite(clickX) ? Number(clickX.toFixed(2)) : clickX,
+                    y: Number.isFinite(clickY) ? Number(clickY.toFixed(2)) : clickY
+                },
+                relative_position: {
+                    x: Number((clickX / areaWidth).toFixed(4)),
+                    y: Number((clickY / areaHeight).toFixed(4))
+                }
+            });
+        };
+
+        dot.addEventListener('click', handleSuccessClick);
+
+        scheduleRedDotTimeout(timeoutMs);
+        displayRedDotProgress();
+    }
+
+    function scheduleRedDotTimeout(duration) {
+        if (redDotTimeout) {
+            clearTimeout(redDotTimeout);
+        }
+        redDotTimeout = window.setTimeout(() => {
+            if (redDotAnswered) {
+                return;
+            }
+            if (redDotElement) {
+                redDotElement.classList.add('red-dot-hidden');
+            }
+            finalizeRedDotAttempt({ clicked: false });
+        }, duration);
+    }
+
+    function displayRedDotProgress() {
+        if (redDotRequiredHits <= 1) {
+            resultMessage.textContent = 'Click the red dot before it disappears!';
+        } else {
+            resultMessage.textContent = `Click the red dot before it disappears! (${redDotHits}/${redDotRequiredHits})`;
+        }
+        resultMessage.className = 'result-message instruction';
     }
 
     function configureNumberPuzzle(data) {
@@ -156,10 +373,7 @@ document.addEventListener('DOMContentLoaded', () => {
         submitBtn.disabled = false;
         submitBtn.textContent = 'Submit';
 
-        puzzleImage.src = data.image_path;
-        puzzleImage.alt = 'CAPTCHA Puzzle';
-        puzzleImage.style.display = 'block';
-        puzzleImageContainer.appendChild(puzzleImage);
+        renderPuzzleMedia(data);
     }
 
     function configureTextPuzzle(data) {
@@ -175,12 +389,7 @@ document.addEventListener('DOMContentLoaded', () => {
         submitBtn.disabled = false;
         submitBtn.textContent = 'Submit';
 
-        if (data.image_path) {
-            puzzleImage.src = data.image_path;
-            puzzleImage.alt = 'CAPTCHA Puzzle';
-            puzzleImage.style.display = 'block';
-            puzzleImageContainer.appendChild(puzzleImage);
-        }
+        renderPuzzleMedia(data);
     }
 
     function setupBingoSwap(data) {
@@ -825,6 +1034,28 @@ document.addEventListener('DOMContentLoaded', () => {
         }, revealSeconds * 1000);
     }
 
+    function finalizeRedDotAttempt(answerPayload) {
+        if (redDotAnswered) {
+            return;
+        }
+        redDotAnswered = true;
+        if (redDotTimeout) {
+            clearTimeout(redDotTimeout);
+            redDotTimeout = null;
+        }
+
+        if (redDotElement) {
+            redDotElement.classList.add('red-dot-hidden');
+        }
+
+        const payload = {
+            ...answerPayload,
+            hit_index: redDotHits
+        };
+
+        submitRedDotAttempt(payload);
+    }
+
     function selectDeformationOption(index, cellElement) {
         if (deformationSelectedIndex === index) {
             deformationSelectedIndex = null;
@@ -890,8 +1121,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function submitAnswer() {
+    function submitAnswer(overrideAnswer = undefined) {
         if (!currentPuzzle) {
+            return;
+        }
+
+        if (currentPuzzle.input_type === 'red_dot_click') {
             return;
         }
 
@@ -1087,7 +1322,9 @@ document.addEventListener('DOMContentLoaded', () => {
             Mirror: 4,
             Deformation: 4,
             Squiggle: 4,
-            Color_Cipher: 3
+            Color_Cipher: 3,
+            Red_Dot: 4,
+            Vision_Ilusion: 3
         };
 
         const difficulty = difficultyRatings[puzzleType] || 1;

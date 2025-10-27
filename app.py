@@ -2,6 +2,7 @@ import os
 import json
 import random
 import uuid
+import time
 from flask import Flask, render_template, request, jsonify, send_from_directory
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
@@ -20,9 +21,13 @@ PUZZLE_TYPE_SEQUENCE = [
     # 'Mirror',
     # 'Deformation',
     # 'Squiggle',
-    'Color_Cipher'
+    # 'Color_Cipher',
+    # 'Vision_Ilusion',
+    'Red_Dot'
 ]
 sequential_index = 0
+
+active_red_dot_puzzles: dict[str, dict] = {}
 
 COLOR_SYMBOL_POOL = [
     ("🟥", "red"),
@@ -151,6 +156,65 @@ def evaluate_color_cipher(expression: str, mapping: list[dict]) -> float:
     return result
 
 
+def generate_red_dot(config: dict) -> dict:
+    """Create a red dot reaction puzzle definition."""
+    area_size = config.get("area_size", [420, 320])
+    if not isinstance(area_size, (list, tuple)) or len(area_size) < 2:
+        area_size = [420, 320]
+    area_width = max(100, int(area_size[0]))
+    area_height = max(100, int(area_size[1]))
+
+    dot_diameter = max(12, int(config.get("dot_diameter", 40)))
+    margin = max(0, int(config.get("margin", 24)))
+
+    max_x = area_width - margin - dot_diameter
+    max_y = area_height - margin - dot_diameter
+    min_x = margin
+    min_y = margin
+
+    if max_x <= min_x:
+        min_x = margin
+        max_x = area_width - dot_diameter
+    if max_y <= min_y:
+        min_y = margin
+        max_y = area_height - dot_diameter
+
+    timeout_ms = int(config.get("timeout_ms", 2000))
+    prompt = config.get("prompt", "Click the red dot before it disappears.")
+    required_hits = max(1, int(config.get("required_hits", 1)))
+    puzzle_id = f"red_dot_{uuid.uuid4().hex}"
+
+    dots: list[dict[str, float]] = []
+    for _ in range(required_hits):
+        x_pos = random.uniform(min_x, max_x)
+        y_pos = random.uniform(min_y, max_y)
+        dots.append({"x": x_pos, "y": y_pos})
+
+    first_dot = dots[0]
+
+    return {
+        "puzzle_id": puzzle_id,
+        "prompt": prompt,
+        "area": {
+            "width": area_width,
+            "height": area_height
+        },
+        "dot": {
+            "x": first_dot["x"],
+            "y": first_dot["y"],
+            "diameter": dot_diameter
+        },
+        "dot_sequence": dots,
+        "timeout_ms": timeout_ms,
+        "input_type": "red_dot_click",
+        "required_hits": required_hits,
+        "debug_info": (
+            f"{required_hits} hit(s). First dot at ({first_dot['x']:.1f}, {first_dot['y']:.1f}) "
+            f"within {area_width}x{area_height} area. Timeout {timeout_ms}ms."
+        )
+    }
+
+
 # Load ground truth data for a specific type
 def load_ground_truth(captcha_type):
     path = os.path.join('captcha_data', captcha_type, 'ground_truth.json')
@@ -244,6 +308,45 @@ def get_puzzle():
             'cipher_state': cipher["cipher_state"]
         }
         return jsonify(response_data)
+    if puzzle_type == "Red_Dot":
+        config = ground_truth.get("config", {})
+        puzzle = generate_red_dot(config)
+        puzzle_id = puzzle["puzzle_id"]
+        dot_diameter = puzzle["dot"]["diameter"]
+        radius = dot_diameter / 2
+        dots = puzzle.get("dot_sequence", [])
+        first_dot_center_x = puzzle["dot"]["x"] + radius
+        first_dot_center_y = puzzle["dot"]["y"] + radius
+
+        active_red_dot_puzzles[puzzle_id] = {
+            "center_x": first_dot_center_x,
+            "center_y": first_dot_center_y,
+            "radius": radius,
+            "timeout_ms": puzzle["timeout_ms"],
+            "current_start_time": time.time(),
+            "area_width": puzzle["area"]["width"],
+            "area_height": puzzle["area"]["height"],
+            "required_hits": puzzle.get("required_hits", 1),
+            "current_index": 0,
+            "dots": dots,
+            "dot_diameter": dot_diameter
+        }
+        response_data = {
+            'puzzle_type': puzzle_type,
+            'image_path': None,
+            'media_path': None,
+            'media_type': None,
+            'puzzle_id': puzzle_id,
+            'prompt': puzzle["prompt"],
+            'input_type': puzzle["input_type"],
+            'area': puzzle["area"],
+            'dot': puzzle["dot"],
+            'timeout_ms': puzzle["timeout_ms"],
+            'required_hits': puzzle.get("required_hits", 1),
+            'hits_completed': 0,
+            'debug_info': f"Type: {puzzle_type}, Input: red_dot_click, Puzzle: {puzzle_id}, {puzzle['debug_info']}"
+        }
+        return jsonify(response_data)
 
     if not ground_truth:
         return jsonify({'error': f'No puzzles found for type: {puzzle_type}'}), 404
@@ -268,6 +371,9 @@ def get_puzzle():
     # Mark this puzzle as seen
     seen_puzzles[puzzle_type].add(selected_puzzle)
     
+    media_type = ground_truth[selected_puzzle].get("media_type")
+    media_path = ground_truth[selected_puzzle].get("media_path")
+
     # Get the appropriate question prompt based on puzzle type
     if puzzle_type == "Dice_Count":
         prompt = ground_truth[selected_puzzle].get('prompt', "Sum up the numbers on all the dice")
@@ -288,6 +394,13 @@ def get_puzzle():
             "prompt",
             "If I release the objects in the left image, choose the right image that shows the correct deformation."
         )
+    elif puzzle_type == "Vision_Ilusion":
+        prompt = ground_truth[selected_puzzle].get(
+            "prompt",
+            "How many circles can you see in the animation?"
+        )
+        if not media_type:
+            media_type = "video"
     else:
         prompt = ground_truth[selected_puzzle].get("prompt", "Solve the CAPTCHA puzzle")
     
@@ -305,6 +418,8 @@ def get_puzzle():
         input_type = "deformation_select"
     elif puzzle_type == "Squiggle":
         input_type = "squiggle_select"
+    elif puzzle_type == "Vision_Ilusion":
+        input_type = "number"
     elif puzzle_type == "Color_Cipher":
         input_type = "color_cipher"
 
@@ -375,10 +490,19 @@ def get_puzzle():
     image_path = None
     if puzzle_type not in ("Rotation_Match", "Shadow_Plausible", "Mirror", "Deformation", "Squiggle", "Color_Cipher"):
         image_path = f'/captcha_data/{puzzle_type}/{selected_puzzle}'
+        if not media_type:
+            media_type = "image"
+        if not media_path:
+            media_path = image_path
+
+    if media_path is None and image_path:
+        media_path = image_path
 
     response_data = {
         'puzzle_type': puzzle_type,
         'image_path': image_path,
+        'media_path': media_path,
+        'media_type': media_type,
         'puzzle_id': selected_puzzle,
         'prompt': prompt,
         'input_type': input_type,
@@ -432,12 +556,13 @@ def check_answer():
     
     ground_truth = load_ground_truth(puzzle_type)
     
-    if puzzle_type != 'Color_Cipher' and puzzle_id not in ground_truth:
+    if puzzle_type not in ('Color_Cipher', 'Red_Dot') and puzzle_id not in ground_truth:
         return jsonify({'error': 'Invalid puzzle ID'}), 400
     
     # Get correct answer based on puzzle type
     is_correct = False
     correct_answer_info = None
+    status = None
             
     
     if puzzle_type == 'Bingo':
@@ -501,6 +626,96 @@ def check_answer():
             correct_answer_info = correct_index
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid answer format for Squiggle'}), 400
+    elif puzzle_type == 'Vision_Ilusion':
+        try:
+            correct_value = int(ground_truth[puzzle_id].get('answer'))
+            user_value = int(user_answer)
+            is_correct = user_value == correct_value
+            correct_answer_info = correct_value
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid answer format for Vision_Ilusion'}), 400
+    elif puzzle_type == 'Red_Dot':
+        state = active_red_dot_puzzles.get(puzzle_id)
+        if state is None:
+            return jsonify({'error': 'Puzzle state expired'}), 400
+        if not isinstance(user_answer, dict):
+            return jsonify({'error': 'Invalid answer format for Red_Dot'}), 400
+
+        try:
+            hit_index = int(user_answer.get('hit_index', state.get('current_index', 0)))
+        except (TypeError, ValueError):
+            return jsonify({'error': 'Invalid hit index for Red_Dot'}), 400
+
+        expected_index = state.get('current_index', 0)
+        if hit_index != expected_index:
+            active_red_dot_puzzles.pop(puzzle_id, None)
+            return jsonify({
+                'correct': False,
+                'status': 'failed',
+                'message': 'Unexpected click order. Puzzle reset.'
+            })
+
+        clicked = bool(user_answer.get('clicked'))
+        position = user_answer.get('position') or {}
+        try:
+            attempt_x = float(position.get('x'))
+            attempt_y = float(position.get('y'))
+        except (TypeError, ValueError):
+            attempt_x, attempt_y = None, None
+
+        timeout_ms = state.get('timeout_ms', 2000)
+        start_time = state.get('current_start_time') or state.get('start_time') or time.time()
+        elapsed_ms = (time.time() - start_time) * 1000
+        within_time = elapsed_ms <= timeout_ms + 200
+
+        within_radius = False
+        if clicked and attempt_x is not None and attempt_y is not None:
+            dx = attempt_x - state['center_x']
+            dy = attempt_y - state['center_y']
+            distance_sq = dx * dx + dy * dy
+            tolerance = max(4.0, state['radius'] * 0.15)
+            within_radius = distance_sq <= (state['radius'] + tolerance) ** 2
+
+        if not clicked or attempt_x is None or attempt_y is None or not within_time or not within_radius:
+            active_red_dot_puzzles.pop(puzzle_id, None)
+            return jsonify({
+                'correct': False,
+                'status': 'failed',
+                'message': 'Missed the red dot in time.'
+            })
+
+        hits_completed = expected_index + 1
+        state['current_index'] = hits_completed
+
+        required_hits = state.get('required_hits', hits_completed)
+
+        if hits_completed >= required_hits:
+            active_red_dot_puzzles.pop(puzzle_id, None)
+            is_correct = True
+            status = 'completed'
+            correct_answer_info = {
+                'hits_completed': hits_completed,
+                'required_hits': required_hits,
+                'last_hit_elapsed_ms': elapsed_ms
+            }
+        else:
+            next_dot = state['dots'][hits_completed]
+            state['center_x'] = next_dot['x'] + state['radius']
+            state['center_y'] = next_dot['y'] + state['radius']
+            state['current_start_time'] = time.time()
+            response_payload = {
+                'correct': False,
+                'status': 'continue',
+                'hits_completed': hits_completed,
+                'required_hits': state['required_hits'],
+                'next_dot': {
+                    'x': next_dot['x'],
+                    'y': next_dot['y'],
+                    'diameter': state['dot_diameter']
+                },
+                'timeout_ms': state['timeout_ms']
+            }
+            return jsonify(response_payload)
     elif puzzle_type == 'Color_Cipher':
         cipher_state = data.get('cipher_state') or {}
         mapping = cipher_state.get('mapping') or []
@@ -530,14 +745,27 @@ def check_answer():
         if isinstance(correct_value, float) and abs(correct_value - round(correct_value)) < 1e-6:
             correct_value = int(round(correct_value))
         correct_payload = correct_value
+    elif puzzle_type == 'Red_Dot':
+        if isinstance(correct_answer_info, dict):
+            hits_done = correct_answer_info.get('hits_completed')
+            hits_required = correct_answer_info.get('required_hits', hits_done)
+            correct_payload = f'Completed {hits_done}/{hits_required} hits.'
+        else:
+            correct_payload = 'Click the red dot before it disappears.'
     else:
         correct_payload = ground_truth[puzzle_id].get(answer_key)
 
-    return jsonify({
+    response_body = {
         'correct': is_correct,
         'user_answer': user_answer,
         'correct_answer': correct_payload
-    })
+    }
+    if status is not None:
+        response_body['status'] = status
+    if puzzle_type == 'Red_Dot' and isinstance(correct_answer_info, dict):
+        response_body['details'] = correct_answer_info
+
+    return jsonify(response_body)
 
 @app.route('/api/benchmark_results', methods=['POST'])
 def record_benchmark():
