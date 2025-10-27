@@ -8,8 +8,8 @@ full-videos/
 inflevel_lab.tar.gz
 *.log
 benchmark_results.json
-*.DS_Store
 .env
 .venv/
 extract_frames.py
 extracted_frames/
+.DS_Store
