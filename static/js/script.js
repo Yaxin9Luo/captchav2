@@ -1324,7 +1324,8 @@ document.addEventListener('DOMContentLoaded', () => {
             Squiggle: 4,
             Color_Cipher: 3,
             Red_Dot: 4,
-            Vision_Ilusion: 3
+            Vision_Ilusion: 3,
+            Adversarial: 3
         };
 
         const difficulty = difficultyRatings[puzzleType] || 1;

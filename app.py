@@ -23,7 +23,8 @@ PUZZLE_TYPE_SEQUENCE = [
     # 'Squiggle',
     # 'Color_Cipher',
     # 'Vision_Ilusion',
-    'Red_Dot'
+    # 'Red_Dot',
+    'Adversarial'
 ]
 sequential_index = 0
 
@@ -401,6 +402,11 @@ def get_puzzle():
         )
         if not media_type:
             media_type = "video"
+    elif puzzle_type == "Adversarial":
+        prompt = ground_truth[selected_puzzle].get(
+            "prompt",
+            "What is the main object in this image?"
+        )
     else:
         prompt = ground_truth[selected_puzzle].get("prompt", "Solve the CAPTCHA puzzle")
     
@@ -422,6 +428,8 @@ def get_puzzle():
         input_type = "number"
     elif puzzle_type == "Color_Cipher":
         input_type = "color_cipher"
+    elif puzzle_type == "Adversarial":
+        input_type = "text"
 
     
     # For Rotation_Match, include additional data needed for the interface
