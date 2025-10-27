@@ -65,6 +65,22 @@ h1 {
     max-width: 1140px;
 }
 
+.puzzle-image-container.adversarial-layout {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 360px;
+}
+
+.puzzle-image-container.adversarial-layout #puzzle-image,
+.puzzle-image-container.adversarial-layout .puzzle-video {
+    width: clamp(260px, 60vw, 780px);
+    max-height: 70vh;
+    border-radius: 8px;
+    margin: 0 auto;
+    object-fit: contain;
+}
+
 #puzzle-image {
     max-width: 100%;
     max-height: 500px;

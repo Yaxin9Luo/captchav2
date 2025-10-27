@@ -19,11 +19,11 @@ PUZZLE_TYPE_SEQUENCE = [
     # 'Bingo',
     # 'Shadow_Plausible',
     # 'Mirror',
-    # 'Deformation',
-    # 'Squiggle',
-    # 'Color_Cipher',
-    # 'Vision_Ilusion',
-    # 'Red_Dot',
+    'Deformation',
+    'Squiggle',
+    'Color_Cipher',
+    'Vision_Ilusion',
+    'Red_Dot',
     'Adversarial'
 ]
 sequential_index = 0

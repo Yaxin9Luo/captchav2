@@ -84,6 +84,9 @@ document.addEventListener('DOMContentLoaded', () => {
         puzzleImageContainer.style.width = '';
         puzzleImageContainer.style.maxWidth = '';
         puzzleImageContainer.style.margin = '';
+        if (puzzleImageContainer) {
+            puzzleImageContainer.classList.remove('adversarial-layout');
+        }
 
         puzzleImage.style.display = 'none';
         puzzleImage.src = '';
@@ -236,6 +239,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 displayDifficultyStars(data.puzzle_type);
                 puzzlePrompt.textContent = data.prompt || 'Solve the CAPTCHA puzzle';
+                if (puzzleImageContainer) {
+                    const isAdversarial = data.puzzle_type === 'Adversarial';
+                    puzzleImageContainer.classList.toggle('adversarial-layout', isAdversarial);
+                }
 
                 switch (data.input_type) {
                     case 'number':
