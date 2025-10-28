@@ -1,0 +1,1132 @@
+{
+  "spooky_circle_grid_direction_0.gif": {
+    "answer": 3,
+    "prompt": "Which cells contain circles rotating COUNTERCLOCKWISE?",
+    "description": "Grid with 6 circles, 3 moving counterclockwise",
+    "media_path": "captcha_data/Spooky_Circle_Grid_Direction/spooky_circle_grid_direction_0.gif",
+    "media_type": "gif",
+    "difficulty": 5,
+    "grid_size": [
+      3,
+      3
+    ],
+    "total_cells": 9,
+    "target_direction": "counterclockwise",
+    "target_cells": [
+      [
+        0,
+        2
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        1,
+        1
+      ]
+    ],
+    "target_cell_indices": [
+      2,
+      3,
+      4
+    ],
+    "all_circle_cells": [
+      [
+        0,
+        2
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        2,
+        2
+      ]
+    ],
+    "cell_directions": {
+      "2": "counterclockwise",
+      "3": "counterclockwise",
+      "4": "counterclockwise",
+      "5": "up",
+      "7": "down",
+      "8": "up"
+    }
+  },
+  "spooky_circle_grid_direction_1.gif": {
+    "answer": 2,
+    "prompt": "Which cells contain circles moving LEFT?",
+    "description": "Grid with 4 circles, 2 moving left",
+    "media_path": "captcha_data/Spooky_Circle_Grid_Direction/spooky_circle_grid_direction_1.gif",
+    "media_type": "gif",
+    "difficulty": 5,
+    "grid_size": [
+      3,
+      3
+    ],
+    "total_cells": 9,
+    "target_direction": "left",
+    "target_cells": [
+      [
+        0,
+        1
+      ],
+      [
+        2,
+        0
+      ]
+    ],
+    "target_cell_indices": [
+      1,
+      6
+    ],
+    "all_circle_cells": [
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        2,
+        0
+      ]
+    ],
+    "cell_directions": {
+      "1": "left",
+      "2": "down",
+      "5": "up",
+      "6": "left"
+    }
+  },
+  "spooky_circle_grid_direction_2.gif": {
+    "answer": 1,
+    "prompt": "Which cells contain circles moving LEFT?",
+    "description": "Grid with 5 circles, 1 moving left",
+    "media_path": "captcha_data/Spooky_Circle_Grid_Direction/spooky_circle_grid_direction_2.gif",
+    "media_type": "gif",
+    "difficulty": 5,
+    "grid_size": [
+      3,
+      3
+    ],
+    "total_cells": 9,
+    "target_direction": "left",
+    "target_cells": [
+      [
+        1,
+        2
+      ]
+    ],
+    "target_cell_indices": [
+      5
+    ],
+    "all_circle_cells": [
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        2,
+        0
+      ],
+      [
+        2,
+        1
+      ]
+    ],
+    "cell_directions": {
+      "0": "clockwise",
+      "3": "down",
+      "5": "left",
+      "6": "right",
+      "7": "counterclockwise"
+    }
+  },
+  "spooky_circle_grid_direction_3.gif": {
+    "answer": 1,
+    "prompt": "Which cells contain circles rotating COUNTERCLOCKWISE?",
+    "description": "Grid with 4 circles, 1 moving counterclockwise",
+    "media_path": "captcha_data/Spooky_Circle_Grid_Direction/spooky_circle_grid_direction_3.gif",
+    "media_type": "gif",
+    "difficulty": 5,
+    "grid_size": [
+      3,
+      3
+    ],
+    "total_cells": 9,
+    "target_direction": "counterclockwise",
+    "target_cells": [
+      [
+        0,
+        0
+      ]
+    ],
+    "target_cell_indices": [
+      0
+    ],
+    "all_circle_cells": [
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        2,
+        2
+      ]
+    ],
+    "cell_directions": {
+      "0": "counterclockwise",
+      "5": "up",
+      "7": "up",
+      "8": "left"
+    }
+  },
+  "spooky_circle_grid_direction_4.gif": {
+    "answer": 3,
+    "prompt": "Which cells contain circles rotating CLOCKWISE?",
+    "description": "Grid with 6 circles, 3 moving clockwise",
+    "media_path": "captcha_data/Spooky_Circle_Grid_Direction/spooky_circle_grid_direction_4.gif",
+    "media_type": "gif",
+    "difficulty": 5,
+    "grid_size": [
+      3,
+      3
+    ],
+    "total_cells": 9,
+    "target_direction": "clockwise",
+    "target_cells": [
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        1,
+        0
+      ]
+    ],
+    "target_cell_indices": [
+      1,
+      2,
+      3
+    ],
+    "all_circle_cells": [
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        2,
+        1
+      ]
+    ],
+    "cell_directions": {
+      "1": "clockwise",
+      "2": "clockwise",
+      "3": "clockwise",
+      "4": "right",
+      "5": "down",
+      "7": "down"
+    }
+  },
+  "spooky_circle_grid_direction_5.gif": {
+    "answer": 2,
+    "prompt": "Which cells contain circles moving LEFT?",
+    "description": "Grid with 4 circles, 2 moving left",
+    "media_path": "captcha_data/Spooky_Circle_Grid_Direction/spooky_circle_grid_direction_5.gif",
+    "media_type": "gif",
+    "difficulty": 5,
+    "grid_size": [
+      3,
+      3
+    ],
+    "total_cells": 9,
+    "target_direction": "left",
+    "target_cells": [
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        1
+      ]
+    ],
+    "target_cell_indices": [
+      1,
+      4
+    ],
+    "all_circle_cells": [
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        2,
+        1
+      ]
+    ],
+    "cell_directions": {
+      "1": "left",
+      "3": "counterclockwise",
+      "4": "left",
+      "7": "up"
+    }
+  },
+  "spooky_circle_grid_direction_6.gif": {
+    "answer": 2,
+    "prompt": "Which cells contain circles moving UP?",
+    "description": "Grid with 3 circles, 2 moving up",
+    "media_path": "captcha_data/Spooky_Circle_Grid_Direction/spooky_circle_grid_direction_6.gif",
+    "media_type": "gif",
+    "difficulty": 5,
+    "grid_size": [
+      3,
+      3
+    ],
+    "total_cells": 9,
+    "target_direction": "up",
+    "target_cells": [
+      [
+        1,
+        0
+      ],
+      [
+        2,
+        0
+      ]
+    ],
+    "target_cell_indices": [
+      3,
+      6
+    ],
+    "all_circle_cells": [
+      [
+        0,
+        2
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        2,
+        0
+      ]
+    ],
+    "cell_directions": {
+      "2": "counterclockwise",
+      "3": "up",
+      "6": "up"
+    }
+  },
+  "spooky_circle_grid_direction_7.gif": {
+    "answer": 3,
+    "prompt": "Which cells contain circles moving DOWN?",
+    "description": "Grid with 6 circles, 3 moving down",
+    "media_path": "captcha_data/Spooky_Circle_Grid_Direction/spooky_circle_grid_direction_7.gif",
+    "media_type": "gif",
+    "difficulty": 5,
+    "grid_size": [
+      3,
+      3
+    ],
+    "total_cells": 9,
+    "target_direction": "down",
+    "target_cells": [
+      [
+        1,
+        2
+      ],
+      [
+        2,
+        0
+      ],
+      [
+        2,
+        1
+      ]
+    ],
+    "target_cell_indices": [
+      5,
+      6,
+      7
+    ],
+    "all_circle_cells": [
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        2,
+        0
+      ],
+      [
+        2,
+        1
+      ]
+    ],
+    "cell_directions": {
+      "1": "right",
+      "2": "counterclockwise",
+      "3": "right",
+      "5": "down",
+      "6": "down",
+      "7": "down"
+    }
+  },
+  "spooky_circle_grid_direction_8.gif": {
+    "answer": 3,
+    "prompt": "Which cells contain circles moving UP?",
+    "description": "Grid with 6 circles, 3 moving up",
+    "media_path": "captcha_data/Spooky_Circle_Grid_Direction/spooky_circle_grid_direction_8.gif",
+    "media_type": "gif",
+    "difficulty": 5,
+    "grid_size": [
+      3,
+      3
+    ],
+    "total_cells": 9,
+    "target_direction": "up",
+    "target_cells": [
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        2,
+        2
+      ]
+    ],
+    "target_cell_indices": [
+      1,
+      2,
+      8
+    ],
+    "all_circle_cells": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        2,
+        2
+      ]
+    ],
+    "cell_directions": {
+      "0": "down",
+      "1": "up",
+      "2": "up",
+      "3": "left",
+      "7": "clockwise",
+      "8": "up"
+    }
+  },
+  "spooky_circle_grid_direction_9.gif": {
+    "answer": 3,
+    "prompt": "Which cells contain circles moving UP?",
+    "description": "Grid with 6 circles, 3 moving up",
+    "media_path": "captcha_data/Spooky_Circle_Grid_Direction/spooky_circle_grid_direction_9.gif",
+    "media_type": "gif",
+    "difficulty": 5,
+    "grid_size": [
+      3,
+      3
+    ],
+    "total_cells": 9,
+    "target_direction": "up",
+    "target_cells": [
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        2,
+        1
+      ]
+    ],
+    "target_cell_indices": [
+      4,
+      5,
+      7
+    ],
+    "all_circle_cells": [
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        2,
+        0
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        2,
+        2
+      ]
+    ],
+    "cell_directions": {
+      "0": "clockwise",
+      "4": "up",
+      "5": "up",
+      "6": "clockwise",
+      "7": "up",
+      "8": "counterclockwise"
+    }
+  },
+  "spooky_circle_grid_direction_10.gif": {
+    "answer": 1,
+    "prompt": "Which cells contain circles rotating CLOCKWISE?",
+    "description": "Grid with 5 circles, 1 moving clockwise",
+    "media_path": "captcha_data/Spooky_Circle_Grid_Direction/spooky_circle_grid_direction_10.gif",
+    "media_type": "gif",
+    "difficulty": 5,
+    "grid_size": [
+      3,
+      3
+    ],
+    "total_cells": 9,
+    "target_direction": "clockwise",
+    "target_cells": [
+      [
+        2,
+        0
+      ]
+    ],
+    "target_cell_indices": [
+      6
+    ],
+    "all_circle_cells": [
+      [
+        0,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        2,
+        0
+      ],
+      [
+        2,
+        2
+      ]
+    ],
+    "cell_directions": {
+      "2": "left",
+      "4": "up",
+      "5": "left",
+      "6": "clockwise",
+      "8": "up"
+    }
+  },
+  "spooky_circle_grid_direction_11.gif": {
+    "answer": 1,
+    "prompt": "Which cells contain circles moving RIGHT?",
+    "description": "Grid with 3 circles, 1 moving right",
+    "media_path": "captcha_data/Spooky_Circle_Grid_Direction/spooky_circle_grid_direction_11.gif",
+    "media_type": "gif",
+    "difficulty": 5,
+    "grid_size": [
+      3,
+      3
+    ],
+    "total_cells": 9,
+    "target_direction": "right",
+    "target_cells": [
+      [
+        2,
+        2
+      ]
+    ],
+    "target_cell_indices": [
+      8
+    ],
+    "all_circle_cells": [
+      [
+        1,
+        0
+      ],
+      [
+        2,
+        0
+      ],
+      [
+        2,
+        2
+      ]
+    ],
+    "cell_directions": {
+      "3": "up",
+      "6": "clockwise",
+      "8": "right"
+    }
+  },
+  "spooky_circle_grid_direction_12.gif": {
+    "answer": 3,
+    "prompt": "Which cells contain circles rotating COUNTERCLOCKWISE?",
+    "description": "Grid with 4 circles, 3 moving counterclockwise",
+    "media_path": "captcha_data/Spooky_Circle_Grid_Direction/spooky_circle_grid_direction_12.gif",
+    "media_type": "gif",
+    "difficulty": 5,
+    "grid_size": [
+      3,
+      3
+    ],
+    "total_cells": 9,
+    "target_direction": "counterclockwise",
+    "target_cells": [
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        2
+      ]
+    ],
+    "target_cell_indices": [
+      0,
+      4,
+      5
+    ],
+    "all_circle_cells": [
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        2,
+        2
+      ]
+    ],
+    "cell_directions": {
+      "0": "counterclockwise",
+      "4": "counterclockwise",
+      "5": "counterclockwise",
+      "8": "clockwise"
+    }
+  },
+  "spooky_circle_grid_direction_13.gif": {
+    "answer": 2,
+    "prompt": "Which cells contain circles rotating COUNTERCLOCKWISE?",
+    "description": "Grid with 3 circles, 2 moving counterclockwise",
+    "media_path": "captcha_data/Spooky_Circle_Grid_Direction/spooky_circle_grid_direction_13.gif",
+    "media_type": "gif",
+    "difficulty": 5,
+    "grid_size": [
+      3,
+      3
+    ],
+    "total_cells": 9,
+    "target_direction": "counterclockwise",
+    "target_cells": [
+      [
+        1,
+        1
+      ],
+      [
+        2,
+        0
+      ]
+    ],
+    "target_cell_indices": [
+      4,
+      6
+    ],
+    "all_circle_cells": [
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        2,
+        0
+      ]
+    ],
+    "cell_directions": {
+      "0": "down",
+      "4": "counterclockwise",
+      "6": "counterclockwise"
+    }
+  },
+  "spooky_circle_grid_direction_14.gif": {
+    "answer": 3,
+    "prompt": "Which cells contain circles moving UP?",
+    "description": "Grid with 7 circles, 3 moving up",
+    "media_path": "captcha_data/Spooky_Circle_Grid_Direction/spooky_circle_grid_direction_14.gif",
+    "media_type": "gif",
+    "difficulty": 5,
+    "grid_size": [
+      3,
+      3
+    ],
+    "total_cells": 9,
+    "target_direction": "up",
+    "target_cells": [
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        2
+      ]
+    ],
+    "target_cell_indices": [
+      1,
+      4,
+      5
+    ],
+    "all_circle_cells": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        2,
+        0
+      ],
+      [
+        2,
+        2
+      ]
+    ],
+    "cell_directions": {
+      "0": "counterclockwise",
+      "1": "up",
+      "3": "clockwise",
+      "4": "up",
+      "5": "up",
+      "6": "clockwise",
+      "8": "right"
+    }
+  },
+  "spooky_circle_grid_direction_15.gif": {
+    "answer": 3,
+    "prompt": "Which cells contain circles rotating COUNTERCLOCKWISE?",
+    "description": "Grid with 4 circles, 3 moving counterclockwise",
+    "media_path": "captcha_data/Spooky_Circle_Grid_Direction/spooky_circle_grid_direction_15.gif",
+    "media_type": "gif",
+    "difficulty": 5,
+    "grid_size": [
+      3,
+      3
+    ],
+    "total_cells": 9,
+    "target_direction": "counterclockwise",
+    "target_cells": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        1,
+        1
+      ]
+    ],
+    "target_cell_indices": [
+      0,
+      2,
+      4
+    ],
+    "all_circle_cells": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        2,
+        1
+      ]
+    ],
+    "cell_directions": {
+      "0": "counterclockwise",
+      "2": "counterclockwise",
+      "4": "counterclockwise",
+      "7": "down"
+    }
+  },
+  "spooky_circle_grid_direction_16.gif": {
+    "answer": 1,
+    "prompt": "Which cells contain circles rotating CLOCKWISE?",
+    "description": "Grid with 2 circles, 1 moving clockwise",
+    "media_path": "captcha_data/Spooky_Circle_Grid_Direction/spooky_circle_grid_direction_16.gif",
+    "media_type": "gif",
+    "difficulty": 5,
+    "grid_size": [
+      3,
+      3
+    ],
+    "total_cells": 9,
+    "target_direction": "clockwise",
+    "target_cells": [
+      [
+        2,
+        0
+      ]
+    ],
+    "target_cell_indices": [
+      6
+    ],
+    "all_circle_cells": [
+      [
+        0,
+        1
+      ],
+      [
+        2,
+        0
+      ]
+    ],
+    "cell_directions": {
+      "1": "down",
+      "6": "clockwise"
+    }
+  },
+  "spooky_circle_grid_direction_17.gif": {
+    "answer": 3,
+    "prompt": "Which cells contain circles moving DOWN?",
+    "description": "Grid with 4 circles, 3 moving down",
+    "media_path": "captcha_data/Spooky_Circle_Grid_Direction/spooky_circle_grid_direction_17.gif",
+    "media_type": "gif",
+    "difficulty": 5,
+    "grid_size": [
+      3,
+      3
+    ],
+    "total_cells": 9,
+    "target_direction": "down",
+    "target_cells": [
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        2,
+        1
+      ]
+    ],
+    "target_cell_indices": [
+      1,
+      3,
+      7
+    ],
+    "all_circle_cells": [
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        2,
+        1
+      ]
+    ],
+    "cell_directions": {
+      "1": "down",
+      "2": "clockwise",
+      "3": "down",
+      "7": "down"
+    }
+  },
+  "spooky_circle_grid_direction_18.gif": {
+    "answer": 3,
+    "prompt": "Which cells contain circles rotating CLOCKWISE?",
+    "description": "Grid with 7 circles, 3 moving clockwise",
+    "media_path": "captcha_data/Spooky_Circle_Grid_Direction/spooky_circle_grid_direction_18.gif",
+    "media_type": "gif",
+    "difficulty": 5,
+    "grid_size": [
+      3,
+      3
+    ],
+    "total_cells": 9,
+    "target_direction": "clockwise",
+    "target_cells": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        1,
+        0
+      ]
+    ],
+    "target_cell_indices": [
+      0,
+      2,
+      3
+    ],
+    "all_circle_cells": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        2,
+        2
+      ]
+    ],
+    "cell_directions": {
+      "0": "clockwise",
+      "2": "clockwise",
+      "3": "clockwise",
+      "4": "right",
+      "5": "left",
+      "7": "down",
+      "8": "counterclockwise"
+    }
+  },
+  "spooky_circle_grid_direction_19.gif": {
+    "answer": 1,
+    "prompt": "Which cells contain circles moving LEFT?",
+    "description": "Grid with 5 circles, 1 moving left",
+    "media_path": "captcha_data/Spooky_Circle_Grid_Direction/spooky_circle_grid_direction_19.gif",
+    "media_type": "gif",
+    "difficulty": 5,
+    "grid_size": [
+      3,
+      3
+    ],
+    "total_cells": 9,
+    "target_direction": "left",
+    "target_cells": [
+      [
+        0,
+        0
+      ]
+    ],
+    "target_cell_indices": [
+      0
+    ],
+    "all_circle_cells": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        2,
+        2
+      ]
+    ],
+    "cell_directions": {
+      "0": "left",
+      "2": "clockwise",
+      "4": "down",
+      "7": "counterclockwise",
+      "8": "right"
+    }
+  }
+}
