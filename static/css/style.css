@@ -277,10 +277,21 @@ body {
 .puzzle-image-container {
     text-align: center;
     position: relative;
-    display: block;
+    display: flex;
+    justify-content: center;
+    align-items: center;
     margin: 0 auto 18px auto;
     width: 100%;
     max-width: 1140px;
+}
+
+.puzzle-image-container:has(.mirror-layout),
+.puzzle-image-container:has(.deformation-layout),
+.puzzle-image-container:has(.squiggle-options-grid),
+.puzzle-image-container:has(.shadow-plausible-grid),
+.puzzle-image-container:has(.bingo-grid) {
+    display: block;
+    flex-direction: column;
 }
 
 .puzzle-image-container.adversarial-layout {
@@ -304,6 +315,7 @@ body {
     max-height: 500px;
     border-radius: 4px;
     display: block;
+    margin: 0 auto;
 }
 
 #puzzle-image.clickable {
@@ -925,6 +937,8 @@ body {
     width: 100%;
     display: flex;
     justify-content: center;
+    margin-top: 32px;
+    clear: both;
 }
 
 .submit-mirror {
@@ -1184,6 +1198,7 @@ body {
     padding: 0 20px;
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     justify-content: center;
+    grid-auto-flow: row;
 }
 
 .squiggle-option {
@@ -1195,8 +1210,10 @@ body {
     transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
     min-height: 240px;
     aspect-ratio: 4 / 3;
-    max-width: 360px;
+    max-width: 100%;
+    width: 100%;
     margin: 0 auto;
+    box-sizing: border-box;
 }
 
 .squiggle-option img {
@@ -1222,7 +1239,8 @@ body {
     width: 100%;
     display: flex;
     justify-content: center;
-    margin-top: 12px;
+    margin-top: 32px;
+    clear: both;
 }
 
 .submit-squiggle {
