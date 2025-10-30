@@ -27,7 +27,7 @@ A comprehensive web-based benchmark platform for testing and evaluating various 
 
 ## Installation
 
-### Using uv (Recommended)
+### Using uv (Highly Recommended! Faster! Easier & more reproducible!)
 
 ```bash
 # Install uv if you haven't already
@@ -37,7 +37,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 uv sync
 
 # Run the application
-uv run python app.py
+uv run app.py
 ```
 
 ### Using pip
