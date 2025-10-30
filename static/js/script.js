@@ -745,6 +745,9 @@ document.addEventListener('DOMContentLoaded', () => {
         optionsSection.appendChild(optionsGrid);
         layout.appendChild(referenceSection);
         layout.appendChild(optionsSection);
+        
+        // Reset container display for mirror layout
+        puzzleImageContainer.style.display = 'block';
         puzzleImageContainer.appendChild(layout);
 
         const submitSection = document.createElement('div');
@@ -903,11 +906,14 @@ document.addEventListener('DOMContentLoaded', () => {
         optionsGrid.className = 'squiggle-options-grid';
         optionsGrid.style.display = 'none';
 
+        // Reset container display for squiggle layout
+        puzzleImageContainer.style.display = 'block';
+        
         const gridSize = Array.isArray(data.grid_size) ? data.grid_size : null;
         if (gridSize && gridSize.length > 1 && Number.isFinite(gridSize[1]) && gridSize[1] > 0) {
-            optionsGrid.style.gridTemplateColumns = `repeat(${gridSize[1]}, minmax(0, 1fr))`;
+            optionsGrid.style.gridTemplateColumns = `repeat(${gridSize[1]}, minmax(160px, 1fr))`;
         } else if (optionImages.length === 4) {
-            optionsGrid.style.gridTemplateColumns = 'repeat(2, minmax(0, 1fr))';
+            optionsGrid.style.gridTemplateColumns = 'repeat(2, minmax(160px, 1fr))';
         }
         optionsGrid.style.columnGap = '40px';
         optionsGrid.style.rowGap = '32px';

@@ -15,17 +15,17 @@ recent_types = []
 MAX_RECENT_TYPES = 5
 
 PUZZLE_TYPE_SEQUENCE = [
-    # 'Dice_Count',
-    # 'Shadow_Plausible',
-    # 'Mirror',
-    # 'Squiggle',
-    # 'Color_Cipher',
+    'Dice_Count',
+    'Shadow_Plausible',
+    'Mirror',
+    'Squiggle',
+    'Color_Cipher',
     'Spooky_Circle_Grid_Direction',
-    # 'Deformation',
+    'Deformation',
     'Spooky_Circle',
     'Spooky_Circle_Grid',
-    # 'Red_Dot',
-    # 'Adversarial'
+    'Red_Dot',
+    'Adversarial'
 ]
 sequential_index = 0
 
