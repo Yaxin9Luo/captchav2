@@ -6,3 +6,10 @@ physics_videos/
 full-videos/
 30fps_videos/
 inflevel_lab.tar.gz
+*.log
+benchmark_results.json
+.env
+.venv/
+extract_frames.py
+extracted_frames/
+.DS_Store

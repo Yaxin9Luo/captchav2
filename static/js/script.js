@@ -18,6 +18,16 @@ document.addEventListener('DOMContentLoaded', () => {
     let bingoSelectedCells = [];
     let shadowSelectedCells = [];
     let mirrorSelectedCells = [];
+    let deformationSelectedIndex = null;
+    let squiggleSelectedIndex = null;
+    let squiggleRevealTimeout = null;
+    let colorCipherRevealTimeout = null;
+    let redDotTimeout = null;
+    let redDotAnswered = false;
+    let redDotHits = 0;
+    let redDotRequiredHits = 0;
+    let redDotTimeoutDuration = 2000;
+    let redDotElement = null;
 
     submitBtn.addEventListener('click', submitAnswer);
     userAnswerInput.addEventListener('keypress', (event) => {
@@ -33,6 +43,25 @@ document.addEventListener('DOMContentLoaded', () => {
         bingoSelectedCells = [];
         shadowSelectedCells = [];
         mirrorSelectedCells = [];
+        deformationSelectedIndex = null;
+        squiggleSelectedIndex = null;
+        if (squiggleRevealTimeout) {
+            clearTimeout(squiggleRevealTimeout);
+            squiggleRevealTimeout = null;
+        }
+        if (colorCipherRevealTimeout) {
+            clearTimeout(colorCipherRevealTimeout);
+            colorCipherRevealTimeout = null;
+        }
+        if (redDotTimeout) {
+            clearTimeout(redDotTimeout);
+            redDotTimeout = null;
+        }
+        redDotAnswered = false;
+        redDotHits = 0;
+        redDotRequiredHits = 0;
+        redDotTimeoutDuration = 2000;
+        redDotElement = null;
 
         if (inputGroup) {
             inputGroup.style.display = 'flex';
@@ -55,8 +84,12 @@ document.addEventListener('DOMContentLoaded', () => {
         puzzleImageContainer.style.width = '';
         puzzleImageContainer.style.maxWidth = '';
         puzzleImageContainer.style.margin = '';
+        if (puzzleImageContainer) {
+            puzzleImageContainer.classList.remove('adversarial-layout');
+        }
 
         puzzleImage.style.display = 'none';
+        puzzleImage.src = '';
 
         const customSelectors = [
             '.bingo-grid',
@@ -64,12 +97,130 @@ document.addEventListener('DOMContentLoaded', () => {
             '.shadow-plausible-grid',
             '.shadow-submit',
             '.mirror-layout',
-            '.mirror-submit'
+            '.mirror-submit',
+            '.deformation-layout',
+            '.deformation-submit',
+            '.squiggle-preview',
+            '.squiggle-options-grid',
+            '.squiggle-submit',
+            '.color-cipher-preview',
+            '.color-cipher-question',
+            '.red-dot-area'
         ];
 
         customSelectors.forEach((selector) => {
             document.querySelectorAll(selector).forEach((element) => element.remove());
         });
+    }
+
+    function submitRedDotAttempt(redDotAnswer) {
+        if (!currentPuzzle || currentPuzzle.input_type !== 'red_dot_click') {
+            return;
+        }
+
+        const answerData = {
+            puzzle_type: currentPuzzle.puzzle_type,
+            puzzle_id: currentPuzzle.puzzle_id,
+            answer: redDotAnswer
+        };
+        answerData.elapsed_time = ((Date.now() - (puzzleStartTime || Date.now())) / 1000).toFixed(2);
+
+        fetch('/api/check_answer', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(answerData)
+        })
+            .then((response) => response.json())
+            .then((data) => {
+                if (data.status === 'continue') {
+                    redDotHits = Number.isFinite(data.hits_completed) ? data.hits_completed : redDotHits;
+                    redDotRequiredHits = Number.isFinite(data.required_hits) ? data.required_hits : redDotRequiredHits;
+                    redDotTimeoutDuration = Number.isFinite(data.timeout_ms) ? data.timeout_ms : redDotTimeoutDuration;
+
+                    const nextDot = data.next_dot || {};
+                    currentPuzzle.dot = nextDot;
+                    currentPuzzle.timeout_ms = redDotTimeoutDuration;
+                    currentPuzzle.required_hits = redDotRequiredHits;
+                    currentPuzzle.hits_completed = redDotHits;
+                    if (redDotElement) {
+                        if (Number.isFinite(nextDot.diameter)) {
+                            redDotElement.style.width = `${nextDot.diameter}px`;
+                            redDotElement.style.height = `${nextDot.diameter}px`;
+                        }
+                        if (Number.isFinite(nextDot.x)) {
+                            redDotElement.style.left = `${nextDot.x}px`;
+                        }
+                        if (Number.isFinite(nextDot.y)) {
+                            redDotElement.style.top = `${nextDot.y}px`;
+                        }
+                        redDotElement.classList.remove('red-dot-hidden');
+                    }
+
+                    redDotAnswered = false;
+                    displayRedDotProgress();
+                    scheduleRedDotTimeout(redDotTimeoutDuration);
+                    return;
+                }
+
+                benchmarkStats.total += 1;
+
+                if (data.correct) {
+                    benchmarkStats.correct += 1;
+                    redDotHits = redDotRequiredHits;
+                    resultMessage.textContent = 'Correct!';
+                    resultMessage.className = 'result-message correct';
+                    createFireworks();
+                } else {
+                    const failureMessage = data.message || 'Incorrect.';
+                    resultMessage.textContent = failureMessage;
+                    resultMessage.className = 'result-message incorrect';
+                    createSadFace();
+                }
+
+                updateStats();
+                recordBenchmarkResult({
+                    puzzle_type: currentPuzzle.puzzle_type,
+                    puzzle_id: currentPuzzle.puzzle_id,
+                    user_answer: redDotAnswer,
+                    correct_answer: data.correct_answer,
+                    correct: data.correct,
+                    elapsed_time: answerData.elapsed_time
+                });
+
+                setTimeout(loadNewPuzzle, 2000);
+            })
+            .catch((error) => {
+                console.error('Error checking red dot answer:', error);
+                showError('Error checking answer. Please try again.');
+            });
+    }
+
+    function renderPuzzleMedia(data) {
+        const mediaPath = data.media_path || data.image_path;
+        if (!mediaPath) {
+            return;
+        }
+
+        const mediaType = (data.media_type || 'image').toLowerCase();
+        if (mediaType === 'video') {
+            const video = document.createElement('video');
+            video.className = 'puzzle-video';
+            video.src = mediaPath;
+            video.autoplay = true;
+            video.loop = true;
+            video.muted = true;
+            video.playsInline = true;
+            video.controls = true;
+            video.setAttribute('preload', 'auto');
+            puzzleImageContainer.appendChild(video);
+        } else {
+            puzzleImage.src = mediaPath;
+            puzzleImage.alt = data.media_alt || data.prompt || 'CAPTCHA Puzzle';
+            puzzleImage.style.display = 'block';
+            puzzleImageContainer.appendChild(puzzleImage);
+        }
     }
 
     function loadNewPuzzle() {
@@ -88,6 +239,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 displayDifficultyStars(data.puzzle_type);
                 puzzlePrompt.textContent = data.prompt || 'Solve the CAPTCHA puzzle';
+                if (puzzleImageContainer) {
+                    const isAdversarial = data.puzzle_type === 'Adversarial';
+                    puzzleImageContainer.classList.toggle('adversarial-layout', isAdversarial);
+                }
 
                 switch (data.input_type) {
                     case 'number':
@@ -98,19 +253,118 @@ document.addEventListener('DOMContentLoaded', () => {
                         break;
                     case 'shadow_plausible':
                         setupShadowPlausibleGrid(data);
-                        break;
-                    case 'mirror_select':
-                        setupMirrorSelect(data);
-                        break;
-                    default:
-                        configureTextPuzzle(data);
-                        break;
-                }
+                break;
+            case 'mirror_select':
+                setupMirrorSelect(data);
+                break;
+            case 'deformation_select':
+                setupDeformationSelect(data);
+                break;
+            case 'squiggle_select':
+                setupSquiggleSelect(data);
+                break;
+            case 'color_cipher':
+                setupColorCipher(data);
+                break;
+            case 'red_dot_click':
+                setupRedDotClick(data);
+                break;
+            default:
+                configureTextPuzzle(data);
+                break;
+        }
             })
             .catch((error) => {
                 console.error('Error loading puzzle:', error);
                 showError('Unable to load a new puzzle. Please refresh the page.');
             });
+    }
+
+    function setupRedDotClick(data) {
+        if (inputGroup) {
+            inputGroup.style.display = 'none';
+        }
+        submitBtn.style.display = 'none';
+
+        redDotAnswered = false;
+        redDotHits = Number.isFinite(data?.hits_completed) ? data.hits_completed : 0;
+        redDotRequiredHits = Number.isFinite(data?.required_hits) ? data.required_hits : 1;
+
+        const areaWidth = Number.isFinite(data?.area?.width) ? data.area.width : 420;
+        const areaHeight = Number.isFinite(data?.area?.height) ? data.area.height : 320;
+        const dotDiameter = Number.isFinite(data?.dot?.diameter) ? data.dot.diameter : 48;
+        const dotX = Number.isFinite(data?.dot?.x) ? data.dot.x : (areaWidth - dotDiameter) / 2;
+        const dotY = Number.isFinite(data?.dot?.y) ? data.dot.y : (areaHeight - dotDiameter) / 2;
+        const timeoutMs = Number.isFinite(data?.timeout_ms) ? data.timeout_ms : 2000;
+        redDotTimeoutDuration = timeoutMs;
+
+        const area = document.createElement('div');
+        area.className = 'red-dot-area';
+        area.style.width = `${areaWidth}px`;
+        area.style.height = `${areaHeight}px`;
+
+        const dot = document.createElement('div');
+        dot.className = 'red-dot';
+        dot.style.width = `${dotDiameter}px`;
+        dot.style.height = `${dotDiameter}px`;
+        dot.style.left = `${dotX}px`;
+        dot.style.top = `${dotY}px`;
+
+        area.appendChild(dot);
+        puzzleImageContainer.appendChild(area);
+
+        redDotElement = dot;
+
+        const handleSuccessClick = (event) => {
+            if (redDotAnswered) {
+                return;
+            }
+            event.stopPropagation();
+            const areaRect = area.getBoundingClientRect();
+            const clickX = event.clientX - areaRect.left;
+            const clickY = event.clientY - areaRect.top;
+
+            finalizeRedDotAttempt({
+                clicked: true,
+                position: {
+                    x: Number.isFinite(clickX) ? Number(clickX.toFixed(2)) : clickX,
+                    y: Number.isFinite(clickY) ? Number(clickY.toFixed(2)) : clickY
+                },
+                relative_position: {
+                    x: Number((clickX / areaWidth).toFixed(4)),
+                    y: Number((clickY / areaHeight).toFixed(4))
+                }
+            });
+        };
+
+        dot.addEventListener('click', handleSuccessClick);
+
+        scheduleRedDotTimeout(timeoutMs);
+        displayRedDotProgress();
+    }
+
+    function scheduleRedDotTimeout(duration) {
+        if (redDotTimeout) {
+            clearTimeout(redDotTimeout);
+        }
+        redDotTimeout = window.setTimeout(() => {
+            if (redDotAnswered) {
+                return;
+            }
+            if (redDotElement) {
+                redDotElement.classList.add('red-dot-hidden');
+            }
+            finalizeRedDotAttempt({ clicked: false });
+        }, duration);
+    }
+
+    function displayRedDotProgress() {
+        if (redDotRequiredHits <= 1) {
+            resultMessage.textContent = 'Click the red dot before it disappears!';
+        } else {
+            resultMessage.textContent = `Click the red dot before it disappears! (${redDotHits}/${redDotRequiredHits})`;
+        }
+        resultMessage.className = 'result-message instruction';
     }
 
     function configureNumberPuzzle(data) {
@@ -126,10 +380,7 @@ document.addEventListener('DOMContentLoaded', () => {
         submitBtn.disabled = false;
         submitBtn.textContent = 'Submit';
 
-        puzzleImage.src = data.image_path;
-        puzzleImage.alt = 'CAPTCHA Puzzle';
-        puzzleImage.style.display = 'block';
-        puzzleImageContainer.appendChild(puzzleImage);
+        renderPuzzleMedia(data);
     }
 
     function configureTextPuzzle(data) {
@@ -145,12 +396,7 @@ document.addEventListener('DOMContentLoaded', () => {
         submitBtn.disabled = false;
         submitBtn.textContent = 'Submit';
 
-        if (data.image_path) {
-            puzzleImage.src = data.image_path;
-            puzzleImage.alt = 'CAPTCHA Puzzle';
-            puzzleImage.style.display = 'block';
-            puzzleImageContainer.appendChild(puzzleImage);
-        }
+        renderPuzzleMedia(data);
     }
 
     function setupBingoSwap(data) {
@@ -522,6 +768,340 @@ document.addEventListener('DOMContentLoaded', () => {
         puzzleImageContainer.appendChild(submitSection);
     }
 
+    function setupDeformationSelect(data) {
+        if (inputGroup) {
+            inputGroup.style.display = 'none';
+        }
+        submitBtn.style.display = 'none';
+
+        deformationSelectedIndex = null;
+
+        const layout = document.createElement('div');
+        layout.className = 'deformation-layout';
+
+        const referenceSection = document.createElement('div');
+        referenceSection.className = 'deformation-reference';
+
+        const referenceLabel = document.createElement('div');
+        referenceLabel.className = 'deformation-reference-label';
+        referenceLabel.textContent = 'Reference';
+        referenceSection.appendChild(referenceLabel);
+
+        const referenceImg = document.createElement('img');
+        referenceImg.src = data.reference_image;
+        referenceImg.alt = 'Reference deformation setup';
+        referenceImg.draggable = false;
+        referenceSection.appendChild(referenceImg);
+
+        const optionsSection = document.createElement('div');
+        optionsSection.className = 'deformation-options';
+
+        const optionsLabel = document.createElement('div');
+        optionsLabel.className = 'deformation-options-label';
+        optionsLabel.textContent = 'Select the correct deformation';
+        optionsSection.appendChild(optionsLabel);
+
+        const optionsGrid = document.createElement('div');
+        optionsGrid.className = 'deformation-options-grid';
+
+        const optionImages = data.option_images || [];
+        if (!optionImages.length) {
+            showError('No deformation options available.');
+            return;
+        }
+
+        const gridSize = data.grid_size || [2, Math.ceil(optionImages.length / 2)];
+        const cols = gridSize[1] || optionImages.length || 1;
+        optionsGrid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+
+        optionImages.forEach((src, index) => {
+            const cell = document.createElement('div');
+            cell.className = 'deformation-option';
+            cell.dataset.index = index;
+
+            const img = document.createElement('img');
+            img.src = src;
+            img.alt = `Deformation option ${index + 1}`;
+            img.draggable = false;
+            cell.appendChild(img);
+
+            const overlay = document.createElement('div');
+            overlay.className = 'deformation-overlay';
+            cell.appendChild(overlay);
+
+            const badge = document.createElement('div');
+            badge.className = 'deformation-checkmark';
+            badge.textContent = '✓';
+            cell.appendChild(badge);
+
+            cell.addEventListener('click', () => selectDeformationOption(index, cell));
+
+            optionsGrid.appendChild(cell);
+        });
+
+        optionsSection.appendChild(optionsGrid);
+        layout.appendChild(referenceSection);
+        layout.appendChild(optionsSection);
+        puzzleImageContainer.appendChild(layout);
+
+        const submitSection = document.createElement('div');
+        submitSection.className = 'deformation-submit';
+
+        const deformationSubmitBtn = document.createElement('button');
+        deformationSubmitBtn.textContent = 'Submit';
+        deformationSubmitBtn.className = 'submit-deformation';
+        deformationSubmitBtn.type = 'button';
+        deformationSubmitBtn.addEventListener('click', () => {
+            if (deformationSelectedIndex === null) {
+                showError('Select one deformation before submitting.');
+                return;
+            }
+            deformationSubmitBtn.disabled = true;
+            deformationSubmitBtn.textContent = 'Processing...';
+            submitAnswer();
+        });
+
+        submitSection.appendChild(deformationSubmitBtn);
+        puzzleImageContainer.appendChild(submitSection);
+    }
+
+    function setupSquiggleSelect(data) {
+        if (inputGroup) {
+            inputGroup.style.display = 'none';
+        }
+        submitBtn.style.display = 'none';
+
+        squiggleSelectedIndex = null;
+
+        const optionImages = data.option_images || [];
+        if (!optionImages.length) {
+            showError('No squiggle options available.');
+            return;
+        }
+
+        const revealDuration = Number.parseInt(data.reveal_duration, 10);
+        const revealSeconds = Number.isFinite(revealDuration) && revealDuration > 0 ? revealDuration : 3;
+
+        const previewWrapper = document.createElement('div');
+        previewWrapper.className = 'squiggle-preview';
+
+        const previewHint = document.createElement('div');
+        previewHint.className = 'squiggle-hint';
+        previewHint.textContent = `Memorize the trace. Choices appear in ${revealSeconds} second${revealSeconds === 1 ? '' : 's'}.`;
+        previewWrapper.appendChild(previewHint);
+
+        const previewImage = document.createElement('img');
+        previewImage.src = data.reference_image;
+        previewImage.alt = 'Trace preview';
+        previewImage.draggable = false;
+        previewImage.className = 'squiggle-preview-image';
+        previewWrapper.appendChild(previewImage);
+
+        puzzleImageContainer.appendChild(previewWrapper);
+
+        const optionsGrid = document.createElement('div');
+        optionsGrid.className = 'squiggle-options-grid';
+        optionsGrid.style.display = 'none';
+
+        const gridSize = Array.isArray(data.grid_size) ? data.grid_size : null;
+        if (gridSize && gridSize.length > 1 && Number.isFinite(gridSize[1]) && gridSize[1] > 0) {
+            optionsGrid.style.gridTemplateColumns = `repeat(${gridSize[1]}, minmax(0, 1fr))`;
+        } else if (optionImages.length === 4) {
+            optionsGrid.style.gridTemplateColumns = 'repeat(2, minmax(0, 1fr))';
+        }
+        optionsGrid.style.columnGap = '40px';
+        optionsGrid.style.rowGap = '32px';
+        optionsGrid.style.justifyContent = 'center';
+
+        optionImages.forEach((src, index) => {
+            const option = document.createElement('div');
+            option.className = 'squiggle-option';
+            option.dataset.index = index;
+
+            const img = document.createElement('img');
+            img.src = src;
+            img.alt = `Squiggle option ${index + 1}`;
+            img.draggable = false;
+            option.appendChild(img);
+
+            option.addEventListener('click', () => selectSquiggleOption(index, option));
+
+            optionsGrid.appendChild(option);
+        });
+
+        puzzleImageContainer.appendChild(optionsGrid);
+
+        const submitSection = document.createElement('div');
+        submitSection.className = 'squiggle-submit';
+        submitSection.style.display = 'none';
+
+        const squiggleSubmitBtn = document.createElement('button');
+        squiggleSubmitBtn.className = 'submit-squiggle';
+        squiggleSubmitBtn.type = 'button';
+        squiggleSubmitBtn.textContent = 'Submit';
+        squiggleSubmitBtn.addEventListener('click', () => {
+            if (squiggleSelectedIndex === null) {
+                showError('Select the squiggle that matches the preview.');
+                return;
+            }
+            squiggleSubmitBtn.disabled = true;
+            squiggleSubmitBtn.textContent = 'Processing...';
+            submitAnswer();
+        });
+
+        submitSection.appendChild(squiggleSubmitBtn);
+        puzzleImageContainer.appendChild(submitSection);
+
+        squiggleRevealTimeout = setTimeout(() => {
+            previewWrapper.remove();
+            optionsGrid.style.display = 'grid';
+            submitSection.style.display = 'flex';
+        }, revealSeconds * 1000);
+    }
+
+    function selectSquiggleOption(index, optionElement) {
+        if (squiggleSelectedIndex === index) {
+            squiggleSelectedIndex = null;
+            optionElement.classList.remove('active');
+            return;
+        }
+
+        const previouslyActive = document.querySelector('.squiggle-option.active');
+        if (previouslyActive) {
+            previouslyActive.classList.remove('active');
+        }
+
+        squiggleSelectedIndex = index;
+        optionElement.classList.add('active');
+    }
+
+    function setupColorCipher(data) {
+        const revealDuration = Number.parseInt(data.reveal_duration, 10);
+        const revealSeconds = Number.isFinite(revealDuration) && revealDuration > 0 ? revealDuration : 3;
+
+        if (inputGroup) {
+            inputGroup.style.display = 'none';
+        }
+
+        submitBtn.style.display = 'block';
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submit';
+
+        userAnswerInput.type = data.input_mode === 'text' ? 'text' : 'number';
+        userAnswerInput.value = '';
+        userAnswerInput.placeholder = 'Enter answer';
+
+        const previewWrapper = document.createElement('div');
+        previewWrapper.className = 'color-cipher-preview';
+
+        const previewTitle = document.createElement('div');
+        previewTitle.className = 'color-cipher-title';
+        previewTitle.textContent = 'Remember these values:';
+        previewWrapper.appendChild(previewTitle);
+
+        const mappingList = document.createElement('div');
+        mappingList.className = 'color-cipher-mapping';
+
+        (data.mapping || []).forEach((item) => {
+            const row = document.createElement('div');
+            row.className = 'color-cipher-row';
+
+            const symbol = document.createElement('span');
+            symbol.className = 'color-cipher-symbol';
+            symbol.textContent = item.symbol || '';
+
+            const value = document.createElement('span');
+            value.className = 'color-cipher-value';
+            value.textContent = `= ${item.value}`;
+
+            row.appendChild(symbol);
+            row.appendChild(value);
+            mappingList.appendChild(row);
+        });
+
+        previewWrapper.appendChild(mappingList);
+        puzzleImageContainer.appendChild(previewWrapper);
+
+        const questionBlock = document.createElement('div');
+        questionBlock.className = 'color-cipher-question';
+        questionBlock.textContent = '';
+        questionBlock.style.display = 'none';
+        puzzleImageContainer.appendChild(questionBlock);
+
+        colorCipherRevealTimeout = setTimeout(() => {
+            previewWrapper.remove();
+            if (inputGroup) {
+                inputGroup.style.display = 'flex';
+            }
+            submitBtn.disabled = false;
+            // questionBlock.textContent = data.question || 'What is the answer?';
+            questionBlock.style.display = 'block';
+            puzzlePrompt.textContent = data.question || 'What is the answer?';
+            userAnswerInput.focus();
+        }, revealSeconds * 1000);
+    }
+
+    function finalizeRedDotAttempt(answerPayload) {
+        if (redDotAnswered) {
+            return;
+        }
+        redDotAnswered = true;
+        if (redDotTimeout) {
+            clearTimeout(redDotTimeout);
+            redDotTimeout = null;
+        }
+
+        if (redDotElement) {
+            redDotElement.classList.add('red-dot-hidden');
+        }
+
+        const payload = {
+            ...answerPayload,
+            hit_index: redDotHits
+        };
+
+        submitRedDotAttempt(payload);
+    }
+
+    function selectDeformationOption(index, cellElement) {
+        if (deformationSelectedIndex === index) {
+            deformationSelectedIndex = null;
+            const overlay = cellElement.querySelector('.deformation-overlay');
+            const badge = cellElement.querySelector('.deformation-checkmark');
+            if (overlay) {
+                overlay.classList.remove('active');
+            }
+            if (badge) {
+                badge.classList.remove('active');
+            }
+            cellElement.classList.remove('active');
+            return;
+        }
+
+        const previouslyActive = document.querySelector('.deformation-option.active');
+        if (previouslyActive) {
+            previouslyActive.classList.remove('active');
+            const previousOverlay = previouslyActive.querySelector('.deformation-overlay');
+            const previousBadge = previouslyActive.querySelector('.deformation-checkmark');
+            if (previousOverlay) {
+                previousOverlay.classList.remove('active');
+            }
+            if (previousBadge) {
+                previousBadge.classList.remove('active');
+            }
+        }
+
+        deformationSelectedIndex = index;
+        const overlay = cellElement.querySelector('.deformation-overlay');
+        const badge = cellElement.querySelector('.deformation-checkmark');
+        if (overlay) {
+            overlay.classList.add('active');
+        }
+        if (badge) {
+            badge.classList.add('active');
+        }
+        cellElement.classList.add('active');
+    }
     function toggleMirrorSelection(index, cellElement) {
         const overlay = cellElement.querySelector('.mirror-overlay');
         const badge = cellElement.querySelector('.mirror-checkmark');
@@ -548,8 +1128,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function submitAnswer() {
+    function submitAnswer(overrideAnswer = undefined) {
         if (!currentPuzzle) {
+            return;
+        }
+
+        if (currentPuzzle.input_type === 'red_dot_click') {
             return;
         }
 
@@ -590,6 +1174,33 @@ document.addEventListener('DOMContentLoaded', () => {
                     showError('Select at least one mirror before submitting.');
                     resetCustomSubmitButtons();
                     return;
+                }
+                break;
+            case 'deformation_select':
+                answerData.answer = deformationSelectedIndex;
+                if (deformationSelectedIndex === null) {
+                    showError('Select one deformation before submitting.');
+                    resetCustomSubmitButtons();
+                    return;
+                }
+                break;
+            case 'squiggle_select':
+                answerData.answer = squiggleSelectedIndex;
+                if (squiggleSelectedIndex === null) {
+                    showError('Select the squiggle that matches the preview.');
+                    resetCustomSubmitButtons();
+                    return;
+                }
+                break;
+            case 'color_cipher':
+                if (!userAnswerInput.value.trim()) {
+                    showError('Enter your answer before submitting.');
+                    resetCustomSubmitButtons();
+                    return;
+                }
+                answerData.answer = userAnswerInput.value.trim();
+                if (currentPuzzle.cipher_state) {
+                    answerData.cipher_state = currentPuzzle.cipher_state;
                 }
                 break;
             default:
@@ -670,6 +1281,18 @@ document.addEventListener('DOMContentLoaded', () => {
             mirrorButton.disabled = false;
             mirrorButton.textContent = 'Submit';
         }
+
+        const deformationButton = document.querySelector('.submit-deformation');
+        if (deformationButton) {
+            deformationButton.disabled = false;
+            deformationButton.textContent = 'Submit';
+        }
+
+        const squiggleButton = document.querySelector('.submit-squiggle');
+        if (squiggleButton) {
+            squiggleButton.disabled = false;
+            squiggleButton.textContent = 'Submit';
+        }
     }
 
     function updateStats() {
@@ -703,7 +1326,13 @@ document.addEventListener('DOMContentLoaded', () => {
             Dice_Count: 3,
             Bingo: 3,
             Shadow_Plausible: 4,
-            Mirror: 4
+            Mirror: 4,
+            Deformation: 4,
+            Squiggle: 4,
+            Color_Cipher: 3,
+            Red_Dot: 4,
+            Vision_Ilusion: 3,
+            Adversarial: 3
         };
 
         const difficulty = difficultyRatings[puzzleType] || 1;

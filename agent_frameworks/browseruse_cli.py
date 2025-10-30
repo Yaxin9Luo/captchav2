@@ -28,7 +28,7 @@ def _build_task_prompt(url: str, limit: int) -> str:
 	You are evaluating Open CaptchaWorld puzzles hosted at {url}.
 
 	Steps you must follow:
-	1. Open {url} in a new tab. Dismiss any popups that might hide the puzzle.
+	1. Open {url} in a new tab. Dismiss any popups that might hide the puzzle. Do not go to any other webiste, stay on the captcha and solve as many as possible.
 	2. For each puzzle, read the requirements to understand what you need to solve.
 	3. Use the "Submit" button to check your answer. When a new puzzle appears, continue with it.
 	4. Stop after you have attempted {limit} puzzle(s) (count both successes and failures). When you have reached the limit or you are blocked, stop interacting with the page.
@@ -173,7 +173,6 @@ async def _run_agent(args: argparse.Namespace) -> int:
 	agent_kwargs = {}
 	if args.max_failures is not None:
 		agent_kwargs['max_failures'] = args.max_failures
-
 	agent = Agent(
 		task=task,
 		llm=llm,
