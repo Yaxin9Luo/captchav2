@@ -16,13 +16,12 @@ MAX_RECENT_TYPES = 5
 
 PUZZLE_TYPE_SEQUENCE = [
     # 'Dice_Count',
-    # 'Bingo',
-    'Shadow_Plausible',
-    'Mirror',
-    'Deformation',
+    # 'Shadow_Plausible',
+    # 'Mirror',
     'Squiggle',
     'Color_Cipher',
     'Vision_Ilusion',
+    'Deformation',
     'Red_Dot',
     'Adversarial'
 ]
