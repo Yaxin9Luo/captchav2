@@ -22,6 +22,8 @@ PUZZLE_TYPE_SEQUENCE = [
     'Color_Cipher',
     'Vision_Ilusion',
     'Deformation',
+    'Spooky_Circle',
+    'Spooky_Circle_Grid',
     'Red_Dot',
     'Adversarial'
 ]
@@ -401,6 +403,20 @@ def get_puzzle():
         )
         if not media_type:
             media_type = "video"
+    elif puzzle_type == "Spooky_Circle":
+        prompt = ground_truth[selected_puzzle].get(
+            "prompt",
+            "How many circles can you see in this animation?"
+        )
+        if not media_type:
+            media_type = "gif"
+    elif puzzle_type == "Spooky_Circle_Grid":
+        prompt = ground_truth[selected_puzzle].get(
+            "prompt",
+            "How many cells contain circles in this grid?"
+        )
+        if not media_type:
+            media_type = "gif"
     elif puzzle_type == "Adversarial":
         prompt = ground_truth[selected_puzzle].get(
             "prompt",
@@ -424,6 +440,10 @@ def get_puzzle():
     elif puzzle_type == "Squiggle":
         input_type = "squiggle_select"
     elif puzzle_type == "Vision_Ilusion":
+        input_type = "number"
+    elif puzzle_type == "Spooky_Circle":
+        input_type = "number"
+    elif puzzle_type == "Spooky_Circle_Grid":
         input_type = "number"
     elif puzzle_type == "Color_Cipher":
         input_type = "color_cipher"
@@ -641,6 +661,22 @@ def check_answer():
             correct_answer_info = correct_value
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid answer format for Vision_Ilusion'}), 400
+    elif puzzle_type == 'Spooky_Circle':
+        try:
+            correct_value = int(ground_truth[puzzle_id].get('answer'))
+            user_value = int(user_answer)
+            is_correct = user_value == correct_value
+            correct_answer_info = correct_value
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid answer format for Spooky_Circle'}), 400
+    elif puzzle_type == 'Spooky_Circle_Grid':
+        try:
+            correct_value = int(ground_truth[puzzle_id].get('answer'))
+            user_value = int(user_answer)
+            is_correct = user_value == correct_value
+            correct_answer_info = correct_value
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid answer format for Spooky_Circle_Grid'}), 400
     elif puzzle_type == 'Red_Dot':
         state = active_red_dot_puzzles.get(puzzle_id)
         if state is None:
