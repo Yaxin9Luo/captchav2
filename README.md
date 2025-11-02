@@ -22,7 +22,7 @@ A comprehensive web-based benchmark platform for testing and evaluating various 
 
 ## Requirements
 
-- Python 3.9 or higher
+- Python 3.11 or higher (required for browser-use integration)
 - See `requirements.txt` or `pyproject.toml` for dependencies
 
 ## Installation
@@ -38,6 +38,9 @@ uv sync
 
 # Run the application
 uv run app.py
+
+# Test the Browser-Use framework agents
+uv run browseruse-cli --url http://10.127.49.104:7860 --llm browser-use --model gpt-5-2025-08-07
 ```
 
 ### Using pip
@@ -69,13 +72,15 @@ The application will run in debug mode on `http://127.0.0.1:7860`
 
 ```bash
 # Using gunicorn (recommended for production)
-gunicorn -w 4 -b 0.0.0.0:7860 app:app
+gunicorn -w 4 -b 127.0.0.1:7860 app:app
 
 # Or run directly
 python app.py
 ```
 
-The application will run on `http://0.0.0.0:7860`
+The application will run on `http://127.0.0.1:7860`
+
+Note: To accept connections from other machines, use `0.0.0.0` instead of `127.0.0.1` in the gunicorn command.
 
 ### Docker
 

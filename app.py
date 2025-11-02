@@ -15,17 +15,17 @@ recent_types = []
 MAX_RECENT_TYPES = 5
 
 PUZZLE_TYPE_SEQUENCE = [
-    'Dice_Count',
-    'Shadow_Plausible',
-    'Mirror',
-    'Squiggle',
-    'Color_Cipher',
+    # 'Dice_Count',
+    # 'Shadow_Plausible',
+    # 'Mirror',
+    # 'Squiggle',
+    # 'Color_Cipher',
     'Spooky_Circle_Grid_Direction',
-    'Deformation',
-    'Spooky_Circle',
-    'Spooky_Circle_Grid',
-    'Red_Dot',
-    'Adversarial'
+    # 'Deformation',
+    # 'Spooky_Circle',
+    # 'Spooky_Circle_Grid',
+    # 'Red_Dot',
+    # 'Adversarial'
 ]
 sequential_index = 0
 
@@ -839,7 +839,7 @@ def get_types():
 if __name__ == '__main__':
     # For local development
     if os.environ.get('DEVELOPMENT'):
-        app.run(debug=True)
+        app.run(debug=True, host='127.0.0.1', port=7860)
     else:
         # For production on Hugging Face Spaces
-        app.run(host='0.0.0.0', port=7860) 
+        app.run(host='127.0.0.1', port=7860) 

@@ -2,7 +2,7 @@
 Command line helper that runs OpenCaptchaWorld puzzles through a CrewAI agent.
 
 Example:
-    python -m agent_frameworks.crewai_cli --url http://127.0.0.1:5000 --limit 3
+    python -m agent_frameworks.crewai_cli --url http://127.0.0.1:7860 --limit 3
 """
 
 from __future__ import annotations
@@ -237,7 +237,7 @@ def _run_crewai(args: argparse.Namespace) -> str:
 def _build_parser() -> argparse.ArgumentParser:
 	"""Create the CLI argument parser."""
 	parser = argparse.ArgumentParser(description='Run OpenCaptchaWorld puzzles using a CrewAI agent.')
-	parser.add_argument('--url', default='http://127.0.0.1:5000', help='URL of the running OpenCaptchaWorld instance.')
+	parser.add_argument('--url', default='http://127.0.0.1:7860', help='URL of the running OpenCaptchaWorld instance.')
 	parser.add_argument('--limit', type=int, default=3, help='Number of puzzle attempts before the agent stops.')
 	parser.add_argument(
 		'--provider',
