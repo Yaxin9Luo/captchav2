@@ -152,6 +152,11 @@ def _create_llm_factory() -> dict[str, Callable[[argparse.Namespace], object]]:
 	"""Return a mapping from CLI option to LLM constructor callables."""
 
 	def browser_use_factory(args: argparse.Namespace):
+		if args.model:
+			raise ValueError(
+				'The browser-use LLM does not support custom model names via --model. '
+				'Use --fast flag instead to use the fast ChatBrowserUse model, or omit --model.'
+			)
 		try:
 			ChatBrowserUse = _resolve_browser_use_client()
 		except ImportError as exc:
@@ -244,6 +249,27 @@ def _create_browser(args: argparse.Namespace) -> Browser | None:
 	return Browser(**browser_kwargs)
 
 
+def _get_model_info(args: argparse.Namespace, llm_name: str) -> str:
+	"""Return a human-readable string describing which model is being used."""
+	if llm_name == 'browser-use':
+		model_desc = 'ChatBrowserUse (fast)' if args.fast else 'ChatBrowserUse (standard)'
+	else:
+		# For other LLMs, show the model name or default
+		defaults = {
+			'openai': 'gpt-4.1-mini',
+			'anthropic': 'claude-3-7-sonnet-20250219',
+			'google': 'gemini-2.0-flash',
+			'groq': 'llama-3.1-70b-versatile',
+			'azure-openai': None,  # Required, no default
+		}
+		model = args.model or defaults.get(llm_name, 'default')
+		if model:
+			model_desc = model
+		else:
+			model_desc = 'default'
+	return f'{llm_name} ({model_desc})'
+
+
 async def _run_agent(args: argparse.Namespace) -> int:
 	"""Run the browser-use agent with the provided CLI options."""
 	llm_factories = _create_llm_factory()
@@ -254,6 +280,48 @@ async def _run_agent(args: argparse.Namespace) -> int:
 		raise ValueError(f'Unsupported llm "{args.llm}". Choose from: {choices}')
 
 	llm = llm_factories[llm_name](args)
+	
+	# Try to get actual model info from the LLM object if available
+	actual_model = None
+	try:
+		# Try common attribute names for model info
+		actual_model = (
+			getattr(llm, 'model_name', None) or
+			getattr(llm, 'model', None) or
+			getattr(llm, '_model_name', None) or
+			getattr(llm, 'llm', None) or  # Some wrappers have nested LLM
+			getattr(llm, '_llm', None)
+		)
+		# If we got a nested LLM object, try to get model from it
+		if actual_model and hasattr(actual_model, 'model_name'):
+			actual_model = actual_model.model_name
+		elif actual_model and hasattr(actual_model, 'model'):
+			actual_model = actual_model.model
+		# For browser-use, try to inspect deeper
+		if llm_name == 'browser-use':
+			fast_mode = getattr(llm, 'fast', None)
+			# Try to find the underlying model by checking nested objects
+			if hasattr(llm, 'llm') or hasattr(llm, '_llm'):
+				nested = getattr(llm, 'llm', None) or getattr(llm, '_llm', None)
+				if nested:
+					nested_model = (
+						getattr(nested, 'model_name', None) or
+						getattr(nested, 'model', None) or
+						getattr(nested, '_model_name', None)
+					)
+					if nested_model:
+						actual_model = f'{nested_model} (fast={fast_mode})' if fast_mode is not None else nested_model
+			if not actual_model and fast_mode is not None:
+				actual_model = f'ChatBrowserUse (fast={fast_mode})'
+	except Exception as e:
+		if args.verbose:
+			logging.debug('Could not extract model info: %s', e)
+	
+	model_info = _get_model_info(args, llm_name)
+	if actual_model:
+		logging.info('Using LLM: %s (actual model: %s)', model_info, actual_model)
+	else:
+		logging.info('Using LLM: %s', model_info)
 	browser = _create_browser(args)
 	task = _build_task_prompt(args.url, args.limit)
 
@@ -310,8 +378,18 @@ def _build_parser() -> argparse.ArgumentParser:
 		default='browser-use',
 		help='LLM backend to use.',
 	)
-	parser.add_argument('--model', help='Override the model name for the selected LLM (if supported).')
-	parser.add_argument('--fast', action='store_true', help='Use the fast ChatBrowserUse model when --llm browser-use.')
+	parser.add_argument(
+		'--model',
+		help='Override the model name for the selected LLM (if supported). '
+		'Note: browser-use backend uses fixed internal models and does not support --model.'
+	)
+	parser.add_argument(
+		'--fast',
+		action='store_true',
+		help='Use the fast ChatBrowserUse model when --llm browser-use. '
+		'Standard mode uses a more powerful model; fast mode uses a faster/cheaper model. '
+		'Both are fixed models managed by the browser-use library.'
+	)
 	parser.add_argument('--max-steps', type=int, default=60, help='Maximum agent reasoning steps.')
 	parser.add_argument(
 		'--max-actions-per-step',
@@ -342,7 +420,12 @@ def main(argv: Optional[list[str]] = None) -> int:
 	except KeyboardInterrupt:
 		print('\nInterrupted by user.')
 		return 1
+	except ValueError as exc:
+		# User input errors - show clean message without traceback
+		logging.error('%s', exc)
+		return 1
 	except Exception as exc:  # pylint: disable=broad-except
+		# Unexpected errors - show full traceback
 		logging.exception('Agent run failed: %s', exc)
 		return 1
 
