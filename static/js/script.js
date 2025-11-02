@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let deformationSelectedIndex = null;
     let squiggleSelectedIndex = null;
     let adversarialSelectedIndex = null;
+    let spookyGridSelectedCells = [];
     let squiggleRevealTimeout = null;
     let colorCipherRevealTimeout = null;
     let redDotTimeout = null;
@@ -269,15 +270,20 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'color_cipher':
                 setupColorCipher(data);
                 break;
-                    case 'red_dot_click':
-                        setupRedDotClick(data);
-                        break;
-                    case 'adversarial_select':
-                        setupAdversarialSelect(data);
-                        break;
-                    default:
-                        configureTextPuzzle(data);
-                        break;
+            case 'red_dot_click':
+                setupRedDotClick(data);
+                break;
+            case 'adversarial_select':
+                setupAdversarialSelect(data);
+                break;
+            case 'circle_grid_select':
+            case 'circle_grid_direction_select':
+            case 'shape_grid_select':
+                setupSpookyGridSelect(data);
+                break;
+            default:
+                configureTextPuzzle(data);
+                break;
         }
             })
             .catch((error) => {
@@ -775,6 +781,111 @@ document.addEventListener('DOMContentLoaded', () => {
 
         submitSection.appendChild(mirrorSubmitBtn);
         puzzleImageContainer.appendChild(submitSection);
+    }
+
+    function setupSpookyGridSelect(data) {
+        if (inputGroup) {
+            inputGroup.style.display = 'none';
+        }
+        submitBtn.style.display = 'none';
+
+        spookyGridSelectedCells = [];
+
+        puzzleImageContainer.style.display = 'block';
+        puzzleImageContainer.style.width = '100%';
+        puzzleImageContainer.style.maxWidth = '960px';
+        puzzleImageContainer.style.margin = '0 auto';
+
+        const gridContainer = document.createElement('div');
+        gridContainer.className = 'spooky-grid-container';
+
+        const optionImages = data.option_images || [];
+        if (!optionImages.length) {
+            showError('No spooky grid options available.');
+            return;
+        }
+
+        const gridSize = data.grid_size || [3, 3];
+        const cols = gridSize[1] || 3;
+        const rows = gridSize[0] || 3;
+        gridContainer.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+        gridContainer.dataset.rows = rows;
+        gridContainer.dataset.cols = cols;
+
+        optionImages.forEach((src, index) => {
+            const cell = document.createElement('div');
+            cell.className = 'spooky-grid-cell';
+            cell.dataset.index = index;
+
+            const img = document.createElement('img');
+            img.src = src;
+            img.alt = `Grid option ${index + 1}`;
+            img.draggable = false;
+            cell.appendChild(img);
+
+            const overlay = document.createElement('div');
+            overlay.className = 'spooky-grid-overlay';
+            cell.appendChild(overlay);
+
+            const checkmark = document.createElement('div');
+            checkmark.className = 'spooky-grid-checkmark';
+            checkmark.textContent = '✓';
+            cell.appendChild(checkmark);
+
+            cell.addEventListener('click', () => toggleSpookyGridSelection(index, cell));
+
+            gridContainer.appendChild(cell);
+        });
+
+        puzzleImageContainer.appendChild(gridContainer);
+
+        const submitSection = document.createElement('div');
+        submitSection.className = 'spooky-grid-submit';
+
+        const spookySubmitBtn = document.createElement('button');
+        spookySubmitBtn.textContent = 'Submit';
+        spookySubmitBtn.className = 'submit-spooky-grid';
+        spookySubmitBtn.type = 'button';
+        spookySubmitBtn.addEventListener('click', () => {
+            if (!spookyGridSelectedCells.length) {
+                showError('Select at least one cell before submitting.');
+                return;
+            }
+            spookySubmitBtn.disabled = true;
+            spookySubmitBtn.textContent = 'Processing...';
+            submitAnswer();
+        });
+
+        submitSection.appendChild(spookySubmitBtn);
+        puzzleImageContainer.appendChild(submitSection);
+    }
+
+    function toggleSpookyGridSelection(index, cellElement) {
+        const overlay = cellElement.querySelector('.spooky-grid-overlay');
+        const checkmark = cellElement.querySelector('.spooky-grid-checkmark');
+
+        const alreadySelected = spookyGridSelectedCells.includes(index);
+        if (alreadySelected) {
+            spookyGridSelectedCells = spookyGridSelectedCells.filter((idx) => idx !== index);
+            if (overlay) {
+                overlay.style.opacity = '0';
+            }
+            if (checkmark) {
+                checkmark.style.opacity = '0';
+            }
+            cellElement.style.transform = 'scale(1)';
+            cellElement.style.borderColor = '#333';
+        } else {
+            spookyGridSelectedCells.push(index);
+            if (overlay) {
+                overlay.style.opacity = '1';
+            }
+            if (checkmark) {
+                checkmark.style.opacity = '1';
+            }
+            cellElement.style.transform = 'scale(0.97)';
+            cellElement.style.borderColor = '#0078ff';
+        }
     }
 
     function setupDeformationSelect(data) {
@@ -1288,6 +1399,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 answerData.answer = userAnswerInput.value.trim();
                 if (currentPuzzle.cipher_state) {
                     answerData.cipher_state = currentPuzzle.cipher_state;
+                }
+                break;
+            case 'circle_grid_select':
+            case 'circle_grid_direction_select':
+            case 'shape_grid_select':
+                answerData.answer = spookyGridSelectedCells;
+                if (!spookyGridSelectedCells.length) {
+                    showError('Select at least one cell before submitting.');
+                    resetCustomSubmitButtons();
+                    return;
                 }
                 break;
             default:
