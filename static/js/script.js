@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let mirrorSelectedCells = [];
     let deformationSelectedIndex = null;
     let squiggleSelectedIndex = null;
+    let adversarialSelectedIndex = null;
     let spookyGridSelectedCells = [];
     let squiggleRevealTimeout = null;
     let colorCipherRevealTimeout = null;
@@ -271,6 +272,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
             case 'red_dot_click':
                 setupRedDotClick(data);
+                break;
+            case 'adversarial_select':
+                setupAdversarialSelect(data);
                 break;
             case 'circle_grid_select':
             case 'circle_grid_direction_select':

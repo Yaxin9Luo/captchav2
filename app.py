@@ -566,11 +566,26 @@ def get_puzzle():
             "target_shape": ground_truth[selected_puzzle].get("target_shape"),
             "target_direction": ground_truth[selected_puzzle].get("target_direction")
         }
+    elif puzzle_type == "Adversarial":
+        options = ground_truth[selected_puzzle].get("options", [])
+        if not options:
+            return jsonify({'error': f'Invalid adversarial data: {selected_puzzle}'}), 500
+
+        additional_data = {
+            "options": options,
+            "answer": ground_truth[selected_puzzle].get("answer")
+        }
     else:
         prompt = ground_truth[selected_puzzle].get("prompt", "Solve the CAPTCHA puzzle")
 
     image_path = None
-    if puzzle_type not in ("Rotation_Match", "Shadow_Plausible", "Mirror", "Deformation", "Squiggle", "Spooky_Circle_Grid", "Spooky_Circle_Grid_Direction", "Spooky_Shape_Grid", "Color_Cipher"):
+    if puzzle_type not in ("Rotation_Match", "Shadow_Plausible", "Mirror", "Deformation", "Squiggle", "Spooky_Circle_Grid", "Spooky_Circle_Grid_Direction", "Spooky_Shape_Grid", "Color_Cipher", "Adversarial"):
+        image_path = f'/captcha_data/{puzzle_type}/{selected_puzzle}'
+        if not media_type:
+            media_type = "image"
+        if not media_path:
+            media_path = image_path
+    elif puzzle_type == "Adversarial":
         image_path = f'/captcha_data/{puzzle_type}/{selected_puzzle}'
         if not media_type:
             media_type = "image"
