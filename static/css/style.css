@@ -289,6 +289,7 @@ body {
 .puzzle-image-container:has(.deformation-layout),
 .puzzle-image-container:has(.squiggle-options-grid),
 .puzzle-image-container:has(.shadow-plausible-grid),
+.puzzle-image-container:has(.spooky-grid-container),
 .puzzle-image-container:has(.bingo-grid) {
     display: block;
     flex-direction: column;
@@ -802,6 +803,115 @@ body {
     }
 
     .submit-shadow {
+        width: 100%;
+    }
+}
+
+/* Spooky Grid CAPTCHA Styles */
+.spooky-grid-container {
+    max-width: 480px;
+    width: 100%;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    padding: 12px;
+    background-color: #0a0a0a;
+    border-radius: 8px;
+}
+
+.spooky-grid-cell {
+    position: relative;
+    border-radius: 4px;
+    overflow: hidden;
+    border: 2px solid #333;
+    background-color: #111;
+    cursor: pointer;
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    aspect-ratio: 1 / 1;
+}
+
+.spooky-grid-cell:hover {
+    transform: scale(1.02);
+    border-color: #0078ff;
+    box-shadow: 0 4px 12px rgba(0, 120, 255, 0.3);
+}
+
+.spooky-grid-cell img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.spooky-grid-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 120, 255, 0.3);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+}
+
+.spooky-grid-checkmark {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 48px;
+    font-weight: bold;
+    color: #0078ff;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+}
+
+.spooky-grid-submit {
+    margin-top: 20px;
+    text-align: center;
+}
+
+.submit-spooky-grid {
+    background-color: #0078ff;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 12px 32px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease;
+    box-shadow: 0 4px 12px rgba(0, 120, 255, 0.3);
+}
+
+.submit-spooky-grid:hover {
+    background-color: #0056b3;
+    box-shadow: 0 6px 16px rgba(0, 120, 255, 0.4);
+    transform: translateY(-1px);
+}
+
+.submit-spooky-grid:disabled {
+    background-color: #95a5a6;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+@media (max-width: 600px) {
+    .spooky-grid-container {
+        max-width: 100%;
+        gap: 6px;
+        padding: 8px;
+    }
+
+    .spooky-grid-checkmark {
+        font-size: 36px;
+    }
+
+    .submit-spooky-grid {
         width: 100%;
     }
 }
