@@ -18,14 +18,14 @@ PUZZLE_TYPE_SEQUENCE = [
     # 'Dice_Count',
     # 'Shadow_Plausible',
     # 'Mirror',
-    # 'Squiggle',
+    'Squiggle',
     # 'Color_Cipher',
     # 'Spooky_Circle_Grid_Direction',
     # 'Deformation',
     # 'Spooky_Circle',
     # 'Spooky_Circle_Grid',
     # 'Red_Dot',
-    'Adversarial'
+    # 'Adversarial'
 ]
 sequential_index = 0
 

@@ -65,9 +65,20 @@ def _build_task_prompt(url: str, limit: int) -> str:
 	   - Double-check your calculation if it's a math problem
 	   - Make sure you've examined ALL visual elements CURRENTLY displayed before answering
 	   
-	4. Enter your answer in the input field or interact with UI elements.
-	5. Click the Submit button (if present - Red Dot puzzles don't have a submit button).
-	6. WAIT 1 second for the result message to appear in #result-message.
+	4. MAKE YOUR SELECTION or ENTER YOUR ANSWER:
+	   - For multiple choice puzzles: Click on the correct answer/option/image
+	   - For input-based puzzles: Type your answer into the input field
+	   - For interactive puzzles: Perform the required interaction (e.g., clicking images, selecting options)
+	   
+	5. CRITICAL - SUBMIT YOUR ANSWER:
+	   - MOST puzzles require clicking a SUBMIT button after making your selection
+	   - Look for a "Submit" button, "Submit Answer" button, or similar submission element
+	   - If you see a submit button, you MUST click it - your answer is NOT submitted until you click submit
+	   - ONLY Red Dot puzzles don't have a submit button (clicking the dot itself submits)
+	   - If you made a selection/entered an answer but didn't click submit, the answer hasn't been submitted yet
+	   - DO NOT check results until AFTER you have clicked the submit button (if one exists)
+	   
+	6. WAIT 1 second after clicking submit for the result message to appear in #result-message.
 	7. Check the result message ONCE - it will say "Correct!" or "Incorrect." or show an error.
 	8. DO NOT repeatedly check the result message - check it once and move on.
 	9. DETECTING NEW PUZZLE: A new puzzle has loaded when:
@@ -92,12 +103,14 @@ def _build_task_prompt(url: str, limit: int) -> str:
 	ANTI-LOOP RULES:
 	- NEVER check the same element more than 2 times in a row.
 	- If an evaluate() call returns the same result twice, MOVE ON.
-	- After submitting an answer, wait 2-3 seconds before checking results.
+	- CRITICAL: After making a selection/entering an answer, you MUST click the SUBMIT button before checking results (except Red Dot puzzles)
+	- After clicking submit, wait 1-2 seconds before checking results.
 	- After checking results, immediately look for the next puzzle and RESET your approach.
 	- If stuck on the same action for 3+ steps, try a different approach or skip to the next puzzle.
 	- If you get "Incorrect" multiple times on the same puzzle, re-examine the CURRENT visual content more carefully
 	- CRITICAL: If you see the EXACT SAME prompt text for 4+ consecutive steps, the puzzle hasn't changed - wait 3 seconds then treat as new
 	- For Red Dot: If you fail, wait for the counter to reset or prompt to change before trying again - don't keep clicking if you already failed
+	- NEVER check results before clicking submit - if you see a submit button, you must click it first
 	
 	STOPPING CONDITIONS:
 	- Stop after attempting {limit} puzzles (count both correct and incorrect).
