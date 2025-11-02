@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let mirrorSelectedCells = [];
     let deformationSelectedIndex = null;
     let squiggleSelectedIndex = null;
+    let adversarialSelectedIndex = null;
     let squiggleRevealTimeout = null;
     let colorCipherRevealTimeout = null;
     let redDotTimeout = null;
@@ -45,6 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
         mirrorSelectedCells = [];
         deformationSelectedIndex = null;
         squiggleSelectedIndex = null;
+        adversarialSelectedIndex = null;
         if (squiggleRevealTimeout) {
             clearTimeout(squiggleRevealTimeout);
             squiggleRevealTimeout = null;
@@ -105,7 +107,8 @@ document.addEventListener('DOMContentLoaded', () => {
             '.squiggle-submit',
             '.color-cipher-preview',
             '.color-cipher-question',
-            '.red-dot-area'
+            '.red-dot-area',
+            '.adversarial-options-container'
         ];
 
         customSelectors.forEach((selector) => {
@@ -266,12 +269,15 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'color_cipher':
                 setupColorCipher(data);
                 break;
-            case 'red_dot_click':
-                setupRedDotClick(data);
-                break;
-            default:
-                configureTextPuzzle(data);
-                break;
+                    case 'red_dot_click':
+                        setupRedDotClick(data);
+                        break;
+                    case 'adversarial_select':
+                        setupAdversarialSelect(data);
+                        break;
+                    default:
+                        configureTextPuzzle(data);
+                        break;
         }
             })
             .catch((error) => {
@@ -868,6 +874,73 @@ document.addEventListener('DOMContentLoaded', () => {
         puzzleImageContainer.appendChild(submitSection);
     }
 
+    function setupAdversarialSelect(data) {
+        if (inputGroup) {
+            inputGroup.style.display = 'none';
+        }
+        submitBtn.style.display = 'none';
+
+        adversarialSelectedIndex = null;
+
+        // Show the puzzle image first
+        renderPuzzleMedia(data);
+
+        // Create options container
+        const optionsContainer = document.createElement('div');
+        optionsContainer.className = 'adversarial-options-container';
+
+        const optionsLabel = document.createElement('div');
+        optionsLabel.className = 'adversarial-options-label';
+        optionsLabel.textContent = 'Select your answer:';
+        optionsContainer.appendChild(optionsLabel);
+
+        const optionsList = document.createElement('div');
+        optionsList.className = 'adversarial-options-list';
+
+        const options = data.options || [];
+        if (!options.length) {
+            showError('No options available for this puzzle.');
+            return;
+        }
+
+        options.forEach((optionText, index) => {
+            const optionButton = document.createElement('button');
+            optionButton.className = 'adversarial-option-button';
+            optionButton.type = 'button';
+            optionButton.textContent = optionText;
+            optionButton.dataset.index = index;
+
+            optionButton.addEventListener('click', () => {
+                // Prevent multiple clicks
+                if (adversarialSelectedIndex !== null) {
+                    return;
+                }
+
+                // Mark as selected
+                adversarialSelectedIndex = index;
+
+                // Visual feedback - disable all buttons and highlight selected
+                const allButtons = optionsList.querySelectorAll('.adversarial-option-button');
+                allButtons.forEach((btn) => {
+                    btn.disabled = true;
+                    if (parseInt(btn.dataset.index) === index) {
+                        btn.classList.add('selected');
+                    } else {
+                        btn.classList.add('disabled');
+                    }
+                });
+
+                // Auto-submit immediately
+                submitAnswer();
+            });
+
+            optionsList.appendChild(optionButton);
+        });
+
+        optionsContainer.appendChild(optionsList);
+        puzzleImageContainer.appendChild(optionsContainer);
+    }
+
     function setupSquiggleSelect(data) {
         if (inputGroup) {
             inputGroup.style.display = 'none';
@@ -1194,6 +1267,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 answerData.answer = squiggleSelectedIndex;
                 if (squiggleSelectedIndex === null) {
                     showError('Select the squiggle that matches the preview.');
+                    resetCustomSubmitButtons();
+                    return;
+                }
+                break;
+            case 'adversarial_select':
+                answerData.answer = adversarialSelectedIndex;
+                if (adversarialSelectedIndex === null) {
+                    showError('Select an option before submitting.');
                     resetCustomSubmitButtons();
                     return;
                 }

@@ -20,12 +20,12 @@ PUZZLE_TYPE_SEQUENCE = [
     # 'Mirror',
     # 'Squiggle',
     # 'Color_Cipher',
-    'Spooky_Circle_Grid_Direction',
+    # 'Spooky_Circle_Grid_Direction',
     # 'Deformation',
     # 'Spooky_Circle',
     # 'Spooky_Circle_Grid',
     # 'Red_Dot',
-    # 'Adversarial'
+    'Adversarial'
 ]
 sequential_index = 0
 
@@ -448,7 +448,7 @@ def get_puzzle():
     elif puzzle_type == "Color_Cipher":
         input_type = "color_cipher"
     elif puzzle_type == "Adversarial":
-        input_type = "text"
+        input_type = "adversarial_select"
 
     
     # For Rotation_Match, include additional data needed for the interface
@@ -511,11 +511,26 @@ def get_puzzle():
             "reveal_duration": ground_truth[selected_puzzle].get("reveal_duration", 3),
             "grid_size": ground_truth[selected_puzzle].get("grid_size")
         }
+    elif puzzle_type == "Adversarial":
+        options = ground_truth[selected_puzzle].get("options", [])
+        if not options:
+            return jsonify({'error': f'Invalid adversarial data: {selected_puzzle}'}), 500
+
+        additional_data = {
+            "options": options,
+            "answer": ground_truth[selected_puzzle].get("answer")
+        }
     else:
         prompt = ground_truth[selected_puzzle].get("prompt", "Solve the CAPTCHA puzzle")
 
     image_path = None
-    if puzzle_type not in ("Rotation_Match", "Shadow_Plausible", "Mirror", "Deformation", "Squiggle", "Color_Cipher"):
+    if puzzle_type not in ("Rotation_Match", "Shadow_Plausible", "Mirror", "Deformation", "Squiggle", "Color_Cipher", "Adversarial"):
+        image_path = f'/captcha_data/{puzzle_type}/{selected_puzzle}'
+        if not media_type:
+            media_type = "image"
+        if not media_path:
+            media_path = image_path
+    elif puzzle_type == "Adversarial":
         image_path = f'/captcha_data/{puzzle_type}/{selected_puzzle}'
         if not media_type:
             media_type = "image"
@@ -653,6 +668,14 @@ def check_answer():
             correct_answer_info = correct_index
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid answer format for Squiggle'}), 400
+    elif puzzle_type == 'Adversarial':
+        try:
+            correct_index = int(ground_truth[puzzle_id].get('answer'))
+            user_index = int(user_answer)
+            is_correct = user_index == correct_index
+            correct_answer_info = correct_index
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid answer format for Adversarial'}), 400
     elif puzzle_type == 'Vision_Ilusion':
         try:
             correct_value = int(ground_truth[puzzle_id].get('answer'))
@@ -795,6 +818,13 @@ def check_answer():
             correct_payload = f'Completed {hits_done}/{hits_required} hits.'
         else:
             correct_payload = 'Click the red dot before it disappears.'
+    elif puzzle_type == 'Adversarial':
+        # Return the option text, not just the index
+        options = ground_truth[puzzle_id].get('options', [])
+        if isinstance(correct_answer_info, int) and 0 <= correct_answer_info < len(options):
+            correct_payload = options[correct_answer_info]
+        else:
+            correct_payload = ground_truth[puzzle_id].get('answer')
     else:
         correct_payload = ground_truth[puzzle_id].get(answer_key)
 
