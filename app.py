@@ -15,19 +15,20 @@ recent_types = []
 MAX_RECENT_TYPES = 5
 
 PUZZLE_TYPE_SEQUENCE = [
-    # 'Dice_Count',
-    # 'Shadow_Plausible',
-    # 'Mirror',
-    # 'Squiggle',
-    # 'Color_Cipher',
-    # 'Spooky_Circle_Grid_Direction',
-    # 'Deformation',
-    # 'Spooky_Circle',
+    'Dice_Count',
+    'Shadow_Plausible',
+    'Mirror',
+    'Squiggle',
+    'Color_Cipher',
+    'Color_Counting',
+    'Spooky_Circle_Grid_Direction',
+    'Deformation',
+    'Spooky_Circle',
     'Spooky_Circle_Grid',
-    # 'Spooky_Shape_Grid',
-    # 'Spooky_Text',
-    # 'Red_Dot',
-    # 'Adversarial'
+    'Spooky_Shape_Grid',
+    'Spooky_Text',
+    'Red_Dot',
+    'Adversarial'
 ]
 sequential_index = 0
 
@@ -469,6 +470,8 @@ def get_puzzle():
         input_type = "text"
     elif puzzle_type == "Color_Cipher":
         input_type = "color_cipher"
+    elif puzzle_type == "Color_Counting":
+        input_type = "color_counting_select"
     elif puzzle_type == "Adversarial":
         input_type = "adversarial_select"
 
@@ -566,6 +569,16 @@ def get_puzzle():
             "target_shape": ground_truth[selected_puzzle].get("target_shape"),
             "target_direction": ground_truth[selected_puzzle].get("target_direction")
         }
+    elif puzzle_type == "Color_Counting":
+        option_images = ground_truth[selected_puzzle].get("options", [])
+        if not option_images:
+            return jsonify({'error': f'Invalid Color_Counting data: {selected_puzzle}'}), 500
+
+        additional_data = {
+            "option_images": [f'/captcha_data/{puzzle_type}/{img}' for img in option_images],
+            "grid_size": ground_truth[selected_puzzle].get("grid_size", [3, 3]),
+            "answer": ground_truth[selected_puzzle].get("answer", [])
+        }
     elif puzzle_type == "Adversarial":
         options = ground_truth[selected_puzzle].get("options", [])
         if not options:
@@ -579,7 +592,7 @@ def get_puzzle():
         prompt = ground_truth[selected_puzzle].get("prompt", "Solve the CAPTCHA puzzle")
 
     image_path = None
-    if puzzle_type not in ("Rotation_Match", "Shadow_Plausible", "Mirror", "Deformation", "Squiggle", "Spooky_Circle_Grid", "Spooky_Circle_Grid_Direction", "Spooky_Shape_Grid", "Color_Cipher", "Adversarial"):
+    if puzzle_type not in ("Rotation_Match", "Shadow_Plausible", "Mirror", "Deformation", "Squiggle", "Spooky_Circle_Grid", "Spooky_Circle_Grid_Direction", "Spooky_Shape_Grid", "Color_Cipher", "Color_Counting", "Adversarial"):
         image_path = f'/captcha_data/{puzzle_type}/{selected_puzzle}'
         if not media_type:
             media_type = "image"
@@ -771,6 +784,14 @@ def check_answer():
             correct_answer_info = correct_indices
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid answer format for Spooky_Shape_Grid'}), 400
+    elif puzzle_type == 'Color_Counting':
+        try:
+            correct_indices = sorted(ground_truth[puzzle_id].get('answer', []))
+            user_indices = sorted(int(idx) for idx in user_answer)
+            is_correct = user_indices == correct_indices
+            correct_answer_info = correct_indices
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid answer format for Color_Counting'}), 400
     elif puzzle_type == 'Red_Dot':
         state = active_red_dot_puzzles.get(puzzle_id)
         if state is None:

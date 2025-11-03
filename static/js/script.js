@@ -279,6 +279,7 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'circle_grid_select':
             case 'circle_grid_direction_select':
             case 'shape_grid_select':
+            case 'color_counting_select':
                 setupSpookyGridSelect(data);
                 break;
             default:
@@ -798,6 +799,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const gridContainer = document.createElement('div');
         gridContainer.className = 'spooky-grid-container';
+
+        // Add special class for Color_Counting to have white background
+        if (data.puzzle_type === 'Color_Counting') {
+            gridContainer.classList.add('color-counting-grid');
+        }
 
         const optionImages = data.option_images || [];
         if (!optionImages.length) {
@@ -1404,6 +1410,7 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'circle_grid_select':
             case 'circle_grid_direction_select':
             case 'shape_grid_select':
+            case 'color_counting_select':
                 answerData.answer = spookyGridSelectedCells;
                 if (!spookyGridSelectedCells.length) {
                     showError('Select at least one cell before submitting.');

@@ -916,6 +916,22 @@ body {
     }
 }
 
+/* Color Counting Grid - White Background Variant */
+.spooky-grid-container.color-counting-grid {
+    background-color: #ffffff;
+    border: 2px solid #ddd;
+    max-width: 640px;
+}
+
+.spooky-grid-container.color-counting-grid .spooky-grid-cell {
+    border: 2px solid #ccc;
+    background-color: #fff;
+}
+
+.spooky-grid-container.color-counting-grid .spooky-grid-cell:hover {
+    border-color: #0078ff;
+}
+
 .mirror-layout {
     display: flex;
     flex-wrap: wrap;
