@@ -20,6 +20,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let mirrorSelectedCells = [];
     let deformationSelectedIndex = null;
     let squiggleSelectedIndex = null;
+    let adversarialSelectedIndex = null;
+    let spookyGridSelectedCells = [];
     let squiggleRevealTimeout = null;
     let colorCipherRevealTimeout = null;
     let redDotTimeout = null;
@@ -45,6 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
         mirrorSelectedCells = [];
         deformationSelectedIndex = null;
         squiggleSelectedIndex = null;
+        adversarialSelectedIndex = null;
         if (squiggleRevealTimeout) {
             clearTimeout(squiggleRevealTimeout);
             squiggleRevealTimeout = null;
@@ -105,7 +108,8 @@ document.addEventListener('DOMContentLoaded', () => {
             '.squiggle-submit',
             '.color-cipher-preview',
             '.color-cipher-question',
-            '.red-dot-area'
+            '.red-dot-area',
+            '.adversarial-options-container'
         ];
 
         customSelectors.forEach((selector) => {
@@ -268,6 +272,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
             case 'red_dot_click':
                 setupRedDotClick(data);
+                break;
+            case 'adversarial_select':
+                setupAdversarialSelect(data);
+                break;
+            case 'circle_grid_select':
+            case 'circle_grid_direction_select':
+            case 'shape_grid_select':
+            case 'color_counting_select':
+                setupSpookyGridSelect(data);
                 break;
             default:
                 configureTextPuzzle(data);
@@ -771,6 +784,116 @@ document.addEventListener('DOMContentLoaded', () => {
         puzzleImageContainer.appendChild(submitSection);
     }
 
+    function setupSpookyGridSelect(data) {
+        if (inputGroup) {
+            inputGroup.style.display = 'none';
+        }
+        submitBtn.style.display = 'none';
+
+        spookyGridSelectedCells = [];
+
+        puzzleImageContainer.style.display = 'block';
+        puzzleImageContainer.style.width = '100%';
+        puzzleImageContainer.style.maxWidth = '960px';
+        puzzleImageContainer.style.margin = '0 auto';
+
+        const gridContainer = document.createElement('div');
+        gridContainer.className = 'spooky-grid-container';
+
+        // Add special class for Color_Counting to have white background
+        if (data.puzzle_type === 'Color_Counting') {
+            gridContainer.classList.add('color-counting-grid');
+        }
+
+        const optionImages = data.option_images || [];
+        if (!optionImages.length) {
+            showError('No spooky grid options available.');
+            return;
+        }
+
+        const gridSize = data.grid_size || [3, 3];
+        const cols = gridSize[1] || 3;
+        const rows = gridSize[0] || 3;
+        gridContainer.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+        gridContainer.dataset.rows = rows;
+        gridContainer.dataset.cols = cols;
+
+        optionImages.forEach((src, index) => {
+            const cell = document.createElement('div');
+            cell.className = 'spooky-grid-cell';
+            cell.dataset.index = index;
+
+            const img = document.createElement('img');
+            img.src = src;
+            img.alt = `Grid option ${index + 1}`;
+            img.draggable = false;
+            cell.appendChild(img);
+
+            const overlay = document.createElement('div');
+            overlay.className = 'spooky-grid-overlay';
+            cell.appendChild(overlay);
+
+            const checkmark = document.createElement('div');
+            checkmark.className = 'spooky-grid-checkmark';
+            checkmark.textContent = '✓';
+            cell.appendChild(checkmark);
+
+            cell.addEventListener('click', () => toggleSpookyGridSelection(index, cell));
+
+            gridContainer.appendChild(cell);
+        });
+
+        puzzleImageContainer.appendChild(gridContainer);
+
+        const submitSection = document.createElement('div');
+        submitSection.className = 'spooky-grid-submit';
+
+        const spookySubmitBtn = document.createElement('button');
+        spookySubmitBtn.textContent = 'Submit';
+        spookySubmitBtn.className = 'submit-spooky-grid';
+        spookySubmitBtn.type = 'button';
+        spookySubmitBtn.addEventListener('click', () => {
+            if (!spookyGridSelectedCells.length) {
+                showError('Select at least one cell before submitting.');
+                return;
+            }
+            spookySubmitBtn.disabled = true;
+            spookySubmitBtn.textContent = 'Processing...';
+            submitAnswer();
+        });
+
+        submitSection.appendChild(spookySubmitBtn);
+        puzzleImageContainer.appendChild(submitSection);
+    }
+
+    function toggleSpookyGridSelection(index, cellElement) {
+        const overlay = cellElement.querySelector('.spooky-grid-overlay');
+        const checkmark = cellElement.querySelector('.spooky-grid-checkmark');
+
+        const alreadySelected = spookyGridSelectedCells.includes(index);
+        if (alreadySelected) {
+            spookyGridSelectedCells = spookyGridSelectedCells.filter((idx) => idx !== index);
+            if (overlay) {
+                overlay.style.opacity = '0';
+            }
+            if (checkmark) {
+                checkmark.style.opacity = '0';
+            }
+            cellElement.style.transform = 'scale(1)';
+            cellElement.style.borderColor = '#333';
+        } else {
+            spookyGridSelectedCells.push(index);
+            if (overlay) {
+                overlay.style.opacity = '1';
+            }
+            if (checkmark) {
+                checkmark.style.opacity = '1';
+            }
+            cellElement.style.transform = 'scale(0.97)';
+            cellElement.style.borderColor = '#0078ff';
+        }
+    }
+
     function setupDeformationSelect(data) {
         if (inputGroup) {
             inputGroup.style.display = 'none';
@@ -866,6 +989,73 @@ document.addEventListener('DOMContentLoaded', () => {
 
         submitSection.appendChild(deformationSubmitBtn);
         puzzleImageContainer.appendChild(submitSection);
+    }
+
+    function setupAdversarialSelect(data) {
+        if (inputGroup) {
+            inputGroup.style.display = 'none';
+        }
+        submitBtn.style.display = 'none';
+
+        adversarialSelectedIndex = null;
+
+        // Show the puzzle image first
+        renderPuzzleMedia(data);
+
+        // Create options container
+        const optionsContainer = document.createElement('div');
+        optionsContainer.className = 'adversarial-options-container';
+
+        const optionsLabel = document.createElement('div');
+        optionsLabel.className = 'adversarial-options-label';
+        optionsLabel.textContent = 'Select your answer:';
+        optionsContainer.appendChild(optionsLabel);
+
+        const optionsList = document.createElement('div');
+        optionsList.className = 'adversarial-options-list';
+
+        const options = data.options || [];
+        if (!options.length) {
+            showError('No options available for this puzzle.');
+            return;
+        }
+
+        options.forEach((optionText, index) => {
+            const optionButton = document.createElement('button');
+            optionButton.className = 'adversarial-option-button';
+            optionButton.type = 'button';
+            optionButton.textContent = optionText;
+            optionButton.dataset.index = index;
+
+            optionButton.addEventListener('click', () => {
+                // Prevent multiple clicks
+                if (adversarialSelectedIndex !== null) {
+                    return;
+                }
+
+                // Mark as selected
+                adversarialSelectedIndex = index;
+
+                // Visual feedback - disable all buttons and highlight selected
+                const allButtons = optionsList.querySelectorAll('.adversarial-option-button');
+                allButtons.forEach((btn) => {
+                    btn.disabled = true;
+                    if (parseInt(btn.dataset.index) === index) {
+                        btn.classList.add('selected');
+                    } else {
+                        btn.classList.add('disabled');
+                    }
+                });
+
+                // Auto-submit immediately
+                submitAnswer();
+            });
+
+            optionsList.appendChild(optionButton);
+        });
+
+        optionsContainer.appendChild(optionsList);
+        puzzleImageContainer.appendChild(optionsContainer);
     }
 
     function setupSquiggleSelect(data) {
@@ -1198,6 +1388,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
                 break;
+            case 'adversarial_select':
+                answerData.answer = adversarialSelectedIndex;
+                if (adversarialSelectedIndex === null) {
+                    showError('Select an option before submitting.');
+                    resetCustomSubmitButtons();
+                    return;
+                }
+                break;
             case 'color_cipher':
                 if (!userAnswerInput.value.trim()) {
                     showError('Enter your answer before submitting.');
@@ -1207,6 +1405,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 answerData.answer = userAnswerInput.value.trim();
                 if (currentPuzzle.cipher_state) {
                     answerData.cipher_state = currentPuzzle.cipher_state;
+                }
+                break;
+            case 'circle_grid_select':
+            case 'circle_grid_direction_select':
+            case 'shape_grid_select':
+            case 'color_counting_select':
+                answerData.answer = spookyGridSelectedCells;
+                if (!spookyGridSelectedCells.length) {
+                    showError('Select at least one cell before submitting.');
+                    resetCustomSubmitButtons();
+                    return;
                 }
                 break;
             default:

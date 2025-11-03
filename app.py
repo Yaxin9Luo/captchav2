@@ -20,10 +20,13 @@ PUZZLE_TYPE_SEQUENCE = [
     'Mirror',
     'Squiggle',
     'Color_Cipher',
+    'Color_Counting',
     'Spooky_Circle_Grid_Direction',
     'Deformation',
     'Spooky_Circle',
     'Spooky_Circle_Grid',
+    'Spooky_Shape_Grid',
+    'Spooky_Text',
     'Red_Dot',
     'Adversarial'
 ]
@@ -417,6 +420,20 @@ def get_puzzle():
         )
         if not media_type:
             media_type = "gif"
+    elif puzzle_type == "Spooky_Shape_Grid":
+        prompt = ground_truth[selected_puzzle].get(
+            "prompt",
+            "Click all matching shapes rotating in the specified direction"
+        )
+        if not media_type:
+            media_type = "gif"
+    elif puzzle_type == "Spooky_Text":
+        prompt = ground_truth[selected_puzzle].get(
+            "prompt",
+            "What text do you see in this animation?"
+        )
+        if not media_type:
+            media_type = "gif"
     elif puzzle_type == "Adversarial":
         prompt = ground_truth[selected_puzzle].get(
             "prompt",
@@ -444,11 +461,19 @@ def get_puzzle():
     elif puzzle_type == "Spooky_Circle":
         input_type = "number"
     elif puzzle_type == "Spooky_Circle_Grid":
-        input_type = "number"
+        input_type = "circle_grid_select"
+    elif puzzle_type == "Spooky_Circle_Grid_Direction":
+        input_type = "circle_grid_direction_select"
+    elif puzzle_type == "Spooky_Shape_Grid":
+        input_type = "shape_grid_select"
+    elif puzzle_type == "Spooky_Text":
+        input_type = "text"
     elif puzzle_type == "Color_Cipher":
         input_type = "color_cipher"
+    elif puzzle_type == "Color_Counting":
+        input_type = "color_counting_select"
     elif puzzle_type == "Adversarial":
-        input_type = "text"
+        input_type = "adversarial_select"
 
     
     # For Rotation_Match, include additional data needed for the interface
@@ -511,11 +536,69 @@ def get_puzzle():
             "reveal_duration": ground_truth[selected_puzzle].get("reveal_duration", 3),
             "grid_size": ground_truth[selected_puzzle].get("grid_size")
         }
+    elif puzzle_type == "Spooky_Circle_Grid":
+        option_gifs = ground_truth[selected_puzzle].get("options", [])
+        if not option_gifs:
+            return jsonify({'error': f'Invalid Spooky_Circle_Grid data: {selected_puzzle}'}), 500
+
+        additional_data = {
+            "option_images": [f'/captcha_data/{puzzle_type}/{gif}' for gif in option_gifs],
+            "grid_size": ground_truth[selected_puzzle].get("grid_size", [3, 3]),
+            "answer": ground_truth[selected_puzzle].get("answer", [])
+        }
+    elif puzzle_type == "Spooky_Circle_Grid_Direction":
+        option_gifs = ground_truth[selected_puzzle].get("options", [])
+        if not option_gifs:
+            return jsonify({'error': f'Invalid Spooky_Circle_Grid_Direction data: {selected_puzzle}'}), 500
+
+        additional_data = {
+            "option_images": [f'/captcha_data/{puzzle_type}/{gif}' for gif in option_gifs],
+            "grid_size": ground_truth[selected_puzzle].get("grid_size", [3, 3]),
+            "answer": ground_truth[selected_puzzle].get("answer", []),
+            "target_direction": ground_truth[selected_puzzle].get("target_direction")
+        }
+    elif puzzle_type == "Spooky_Shape_Grid":
+        option_gifs = ground_truth[selected_puzzle].get("options", [])
+        if not option_gifs:
+            return jsonify({'error': f'Invalid Spooky_Shape_Grid data: {selected_puzzle}'}), 500
+
+        additional_data = {
+            "option_images": [f'/captcha_data/{puzzle_type}/{gif}' for gif in option_gifs],
+            "grid_size": ground_truth[selected_puzzle].get("grid_size", [3, 3]),
+            "answer": ground_truth[selected_puzzle].get("answer", []),
+            "target_shape": ground_truth[selected_puzzle].get("target_shape"),
+            "target_direction": ground_truth[selected_puzzle].get("target_direction")
+        }
+    elif puzzle_type == "Color_Counting":
+        option_images = ground_truth[selected_puzzle].get("options", [])
+        if not option_images:
+            return jsonify({'error': f'Invalid Color_Counting data: {selected_puzzle}'}), 500
+
+        additional_data = {
+            "option_images": [f'/captcha_data/{puzzle_type}/{img}' for img in option_images],
+            "grid_size": ground_truth[selected_puzzle].get("grid_size", [3, 3]),
+            "answer": ground_truth[selected_puzzle].get("answer", [])
+        }
+    elif puzzle_type == "Adversarial":
+        options = ground_truth[selected_puzzle].get("options", [])
+        if not options:
+            return jsonify({'error': f'Invalid adversarial data: {selected_puzzle}'}), 500
+
+        additional_data = {
+            "options": options,
+            "answer": ground_truth[selected_puzzle].get("answer")
+        }
     else:
         prompt = ground_truth[selected_puzzle].get("prompt", "Solve the CAPTCHA puzzle")
 
     image_path = None
-    if puzzle_type not in ("Rotation_Match", "Shadow_Plausible", "Mirror", "Deformation", "Squiggle", "Color_Cipher"):
+    if puzzle_type not in ("Rotation_Match", "Shadow_Plausible", "Mirror", "Deformation", "Squiggle", "Spooky_Circle_Grid", "Spooky_Circle_Grid_Direction", "Spooky_Shape_Grid", "Color_Cipher", "Color_Counting", "Adversarial"):
+        image_path = f'/captcha_data/{puzzle_type}/{selected_puzzle}'
+        if not media_type:
+            media_type = "image"
+        if not media_path:
+            media_path = image_path
+    elif puzzle_type == "Adversarial":
         image_path = f'/captcha_data/{puzzle_type}/{selected_puzzle}'
         if not media_type:
             media_type = "image"
@@ -653,6 +736,14 @@ def check_answer():
             correct_answer_info = correct_index
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid answer format for Squiggle'}), 400
+    elif puzzle_type == 'Adversarial':
+        try:
+            correct_index = int(ground_truth[puzzle_id].get('answer'))
+            user_index = int(user_answer)
+            is_correct = user_index == correct_index
+            correct_answer_info = correct_index
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid answer format for Adversarial'}), 400
     elif puzzle_type == 'Vision_Ilusion':
         try:
             correct_value = int(ground_truth[puzzle_id].get('answer'))
@@ -671,12 +762,36 @@ def check_answer():
             return jsonify({'error': 'Invalid answer format for Spooky_Circle'}), 400
     elif puzzle_type == 'Spooky_Circle_Grid':
         try:
-            correct_value = int(ground_truth[puzzle_id].get('answer'))
-            user_value = int(user_answer)
-            is_correct = user_value == correct_value
-            correct_answer_info = correct_value
+            correct_indices = sorted(ground_truth[puzzle_id].get('answer', []))
+            user_indices = sorted(int(idx) for idx in user_answer)
+            is_correct = user_indices == correct_indices
+            correct_answer_info = correct_indices
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid answer format for Spooky_Circle_Grid'}), 400
+    elif puzzle_type == 'Spooky_Circle_Grid_Direction':
+        try:
+            correct_indices = sorted(ground_truth[puzzle_id].get('answer', []))
+            user_indices = sorted(int(idx) for idx in user_answer)
+            is_correct = user_indices == correct_indices
+            correct_answer_info = correct_indices
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid answer format for Spooky_Circle_Grid_Direction'}), 400
+    elif puzzle_type == 'Spooky_Shape_Grid':
+        try:
+            correct_indices = sorted(ground_truth[puzzle_id].get('answer', []))
+            user_indices = sorted(int(idx) for idx in user_answer)
+            is_correct = user_indices == correct_indices
+            correct_answer_info = correct_indices
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid answer format for Spooky_Shape_Grid'}), 400
+    elif puzzle_type == 'Color_Counting':
+        try:
+            correct_indices = sorted(ground_truth[puzzle_id].get('answer', []))
+            user_indices = sorted(int(idx) for idx in user_answer)
+            is_correct = user_indices == correct_indices
+            correct_answer_info = correct_indices
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid answer format for Color_Counting'}), 400
     elif puzzle_type == 'Red_Dot':
         state = active_red_dot_puzzles.get(puzzle_id)
         if state is None:
@@ -795,6 +910,13 @@ def check_answer():
             correct_payload = f'Completed {hits_done}/{hits_required} hits.'
         else:
             correct_payload = 'Click the red dot before it disappears.'
+    elif puzzle_type == 'Adversarial':
+        # Return the option text, not just the index
+        options = ground_truth[puzzle_id].get('options', [])
+        if isinstance(correct_answer_info, int) and 0 <= correct_answer_info < len(options):
+            correct_payload = options[correct_answer_info]
+        else:
+            correct_payload = ground_truth[puzzle_id].get('answer')
     else:
         correct_payload = ground_truth[puzzle_id].get(answer_key)
 
@@ -839,7 +961,7 @@ def get_types():
 if __name__ == '__main__':
     # For local development
     if os.environ.get('DEVELOPMENT'):
-        app.run(debug=True)
+        app.run(debug=True, host='127.0.0.1', port=7860)
     else:
         # For production on Hugging Face Spaces
-        app.run(host='0.0.0.0', port=7860) 
+        app.run(host='127.0.0.1', port=7860) 
