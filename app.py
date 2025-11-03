@@ -3,6 +3,7 @@ import json
 import random
 import uuid
 import time
+import math
 from flask import Flask, render_template, request, jsonify, send_from_directory
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
@@ -15,24 +16,26 @@ recent_types = []
 MAX_RECENT_TYPES = 5
 
 PUZZLE_TYPE_SEQUENCE = [
-    'Dice_Count',
-    'Shadow_Plausible',
-    'Mirror',
-    'Squiggle',
-    'Color_Cipher',
-    'Color_Counting',
-    'Spooky_Circle_Grid_Direction',
-    'Deformation',
-    'Spooky_Circle',
-    'Spooky_Circle_Grid',
-    'Spooky_Shape_Grid',
-    'Spooky_Text',
+    #'Dice_Count',
+    #'Shadow_Plausible',
+    #'Mirror',
+    #'Squiggle',
+    #'Color_Cipher',
+    #'Color_Counting',
+    'Spooky_Size',
+    #'Spooky_Circle_Grid_Direction',
+    #'Deformation',
+    #'Spooky_Circle',
+    #'Spooky_Circle_Grid',
+    #'Spooky_Shape_Grid',
+    #'Spooky_Text',
     'Red_Dot',
-    'Adversarial'
+    #'Adversarial'
 ]
 sequential_index = 0
 
 active_red_dot_puzzles: dict[str, dict] = {}
+active_spooky_size_puzzles: dict[str, dict] = {}
 
 COLOR_SYMBOL_POOL = [
     ("🟥", "red"),
@@ -353,6 +356,47 @@ def get_puzzle():
         }
         return jsonify(response_data)
 
+    if puzzle_type == "Spooky_Size":
+        if not ground_truth:
+            return jsonify({'error': f'No puzzles found for type: {puzzle_type}'}), 404
+
+        # Select random puzzle
+        puzzle_files = list(ground_truth.keys())
+        selected_puzzle = random.choice(puzzle_files)
+        puzzle_data = ground_truth[selected_puzzle]
+
+        # Generate unique puzzle ID
+        puzzle_id = f"spooky_size_{int(time.time()*1000)}_{random.randint(1000,9999)}"
+
+        # Store the target position for validation
+        # Convert from top-left + diameter to center (like Red Dot does)
+        target_pos = puzzle_data["target_position"]
+        diameter = target_pos.get("diameter", target_pos.get("radius", 0) * 2)  # Support both old and new format
+        radius = diameter / 2
+        center_x = target_pos["x"] + radius
+        center_y = target_pos["y"] + radius
+
+        active_spooky_size_puzzles[puzzle_id] = {
+            "target_x": center_x,
+            "target_y": center_y,
+            "radius": radius,
+            "start_time": time.time()
+        }
+
+        response_data = {
+            'puzzle_type': puzzle_type,
+            'image_path': None,
+            'media_path': f'/captcha_data/{puzzle_type}/{selected_puzzle}.gif',
+            'media_type': 'gif',
+            'puzzle_id': puzzle_id,
+            'prompt': puzzle_data["prompt"],
+            'input_type': 'spooky_size_click',
+            'canvas_width': 600,
+            'canvas_height': 400,
+            'debug_info': f"Type: {puzzle_type}, Puzzle: {selected_puzzle}"
+        }
+        return jsonify(response_data)
+
     if not ground_truth:
         return jsonify({'error': f'No puzzles found for type: {puzzle_type}'}), 404
     
@@ -666,7 +710,7 @@ def check_answer():
     
     ground_truth = load_ground_truth(puzzle_type)
     
-    if puzzle_type not in ('Color_Cipher', 'Red_Dot') and puzzle_id not in ground_truth:
+    if puzzle_type not in ('Color_Cipher', 'Red_Dot', 'Spooky_Size') and puzzle_id not in ground_truth:
         return jsonify({'error': 'Invalid puzzle ID'}), 400
     
     # Get correct answer based on puzzle type
@@ -792,6 +836,46 @@ def check_answer():
             correct_answer_info = correct_indices
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid answer format for Color_Counting'}), 400
+    elif puzzle_type == 'Spooky_Size':
+        state = active_spooky_size_puzzles.get(puzzle_id)
+        if state is None:
+            return jsonify({'error': 'Puzzle state expired'}), 400
+        if not isinstance(user_answer, dict):
+            return jsonify({'error': 'Invalid answer format for Spooky_Size'}), 400
+
+        # Get click position
+        position = user_answer.get('position') or {}
+        try:
+            click_x = float(position.get('x'))
+            click_y = float(position.get('y'))
+        except (TypeError, ValueError):
+            return jsonify({'error': 'Invalid click position for Spooky_Size'}), 400
+
+        # Check if click is within the target radius (with tolerance like Red Dot)
+        target_x = state['target_x']
+        target_y = state['target_y']
+        radius = state['radius']
+
+        # Add tolerance like Red Dot does (15% of radius + minimum 4px)
+        dx = click_x - target_x
+        dy = click_y - target_y
+        distance_sq = dx * dx + dy * dy
+        tolerance = max(4.0, radius * 0.15)
+        is_correct = distance_sq <= (radius + tolerance) ** 2
+
+        distance = math.sqrt(distance_sq)
+
+        # Clean up
+        active_spooky_size_puzzles.pop(puzzle_id, None)
+
+        correct_answer_info = {
+            "target_x": target_x,
+            "target_y": target_y,
+            "radius": radius,
+            "click_x": click_x,
+            "click_y": click_y,
+            "distance": float(distance)
+        }
     elif puzzle_type == 'Red_Dot':
         state = active_red_dot_puzzles.get(puzzle_id)
         if state is None:
@@ -917,6 +1001,12 @@ def check_answer():
             correct_payload = options[correct_answer_info]
         else:
             correct_payload = ground_truth[puzzle_id].get('answer')
+    elif puzzle_type == 'Spooky_Size':
+        # Spooky_Size uses dynamic puzzle IDs, return validation details
+        if isinstance(correct_answer_info, dict):
+            correct_payload = f"Target at ({correct_answer_info['target_x']:.0f}, {correct_answer_info['target_y']:.0f}), radius {correct_answer_info['radius']:.0f}px"
+        else:
+            correct_payload = "Click validation details"
     else:
         correct_payload = ground_truth[puzzle_id].get(answer_key)
 
@@ -928,6 +1018,8 @@ def check_answer():
     if status is not None:
         response_body['status'] = status
     if puzzle_type == 'Red_Dot' and isinstance(correct_answer_info, dict):
+        response_body['details'] = correct_answer_info
+    if puzzle_type == 'Spooky_Size' and isinstance(correct_answer_info, dict):
         response_body['details'] = correct_answer_info
 
     return jsonify(response_body)

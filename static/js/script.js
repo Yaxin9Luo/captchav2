@@ -273,6 +273,9 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'red_dot_click':
                 setupRedDotClick(data);
                 break;
+            case 'spooky_size_click':
+                setupSpookySizeClick(data);
+                break;
             case 'adversarial_select':
                 setupAdversarialSelect(data);
                 break;
@@ -378,6 +381,100 @@ document.addEventListener('DOMContentLoaded', () => {
             resultMessage.textContent = `Click the red dot before it disappears! (${redDotHits}/${redDotRequiredHits})`;
         }
         resultMessage.className = 'result-message instruction';
+    }
+
+    function setupSpookySizeClick(data) {
+        if (inputGroup) {
+            inputGroup.style.display = 'none';
+        }
+        submitBtn.style.display = 'none';
+
+        const canvasWidth = data.canvas_width || 600;
+        const canvasHeight = data.canvas_height || 400;
+
+        // Create clickable canvas overlay for the GIF
+        const clickArea = document.createElement('div');
+        clickArea.className = 'spooky-size-click-area';
+        clickArea.style.width = `${canvasWidth}px`;
+        clickArea.style.height = `${canvasHeight}px`;
+        clickArea.style.position = 'relative';
+        clickArea.style.margin = '0 auto';
+        clickArea.style.cursor = 'crosshair';
+        clickArea.style.border = '2px solid #333';
+        clickArea.style.backgroundColor = '#000';
+
+        // Add the GIF as background or img element
+        const gifImg = document.createElement('img');
+        gifImg.src = data.media_path;
+        gifImg.alt = 'Spooky Size Puzzle';
+        gifImg.style.width = '100%';
+        gifImg.style.height = '100%';
+        gifImg.style.display = 'block';
+        gifImg.style.pointerEvents = 'none'; // Let clicks pass through to parent
+
+        clickArea.appendChild(gifImg);
+
+        // Handle click
+        clickArea.addEventListener('click', (event) => {
+            const rect = clickArea.getBoundingClientRect();
+            const clickX = event.clientX - rect.left;
+            const clickY = event.clientY - rect.top;
+
+            // Visual feedback
+            const marker = document.createElement('div');
+            marker.style.position = 'absolute';
+            marker.style.left = `${clickX}px`;
+            marker.style.top = `${clickY}px`;
+            marker.style.width = '20px';
+            marker.style.height = '20px';
+            marker.style.marginLeft = '-10px';
+            marker.style.marginTop = '-10px';
+            marker.style.borderRadius = '50%';
+            marker.style.border = '3px solid #0078ff';
+            marker.style.backgroundColor = 'rgba(0, 120, 255, 0.3)';
+            marker.style.pointerEvents = 'none';
+            clickArea.appendChild(marker);
+
+            // Disable further clicks
+            clickArea.style.pointerEvents = 'none';
+
+            // Submit answer
+            const answerData = {
+                puzzle_type: currentPuzzle.puzzle_type,
+                puzzle_id: currentPuzzle.puzzle_id,
+                answer: {
+                    position: {
+                        x: Number(clickX.toFixed(2)),
+                        y: Number(clickY.toFixed(2))
+                    }
+                }
+            };
+
+            fetch('/api/check_answer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(answerData)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.correct) {
+                    resultMessage.textContent = 'Correct! You clicked the right shape.';
+                    resultMessage.className = 'result-message correct';
+                } else {
+                    resultMessage.textContent = 'Incorrect. Try the next puzzle.';
+                    resultMessage.className = 'result-message incorrect';
+                }
+                setTimeout(() => loadNewPuzzle(), 2000);
+            })
+            .catch(error => {
+                console.error('Error submitting answer:', error);
+                resultMessage.textContent = 'Error submitting answer.';
+                resultMessage.className = 'result-message incorrect';
+            });
+        });
+
+        puzzleImageContainer.appendChild(clickArea);
+        puzzleImageContainer.style.display = 'block';
     }
 
     function configureNumberPuzzle(data) {
