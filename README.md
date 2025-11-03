@@ -40,7 +40,7 @@ uv sync
 uv run app.py
 
 # Test the Browser-Use framework agents
-uv run browseruse-cli --url http://10.127.49.104:7860 --llm browser-use --model gpt-5-2025-08-07
+uv run browseruse-cli --url http://127.0.0.1:7860 --llm browser-use --model gpt-5-2025-08-07
 ```
 
 ### Using pip
