@@ -30,6 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let redDotRequiredHits = 0;
     let redDotTimeoutDuration = 2000;
     let redDotElement = null;
+    let spookySizeAnswered = false;
 
     submitBtn.addEventListener('click', submitAnswer);
     userAnswerInput.addEventListener('keypress', (event) => {
@@ -65,6 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
         redDotRequiredHits = 0;
         redDotTimeoutDuration = 2000;
         redDotElement = null;
+        spookySizeAnswered = false;
 
         if (inputGroup) {
             inputGroup.style.display = 'flex';
@@ -416,6 +418,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Handle click
         clickArea.addEventListener('click', (event) => {
+            if (spookySizeAnswered) {
+                return;
+            }
+
             const rect = clickArea.getBoundingClientRect();
             const clickX = event.clientX - rect.left;
             const clickY = event.clientY - rect.top;
@@ -437,6 +443,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Disable further clicks
             clickArea.style.pointerEvents = 'none';
+            spookySizeAnswered = true;
 
             // Submit answer
             const answerData = {
@@ -456,8 +463,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(answerData)
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => {
+                        throw new Error(err.error || `HTTP error! status: ${response.status}`);
+                    });
+                }
+                return response.json();
+            })
             .then(result => {
+                if (result.error) {
+                    throw new Error(result.error);
+                }
+
                 benchmarkStats.total += 1;
 
                 if (result.correct) {
@@ -485,7 +503,7 @@ document.addEventListener('DOMContentLoaded', () => {
             })
             .catch(error => {
                 console.error('Error submitting answer:', error);
-                resultMessage.textContent = 'Error submitting answer.';
+                resultMessage.textContent = `Error: ${error.message || 'Error submitting answer.'}`;
                 resultMessage.className = 'result-message incorrect';
             });
         });
