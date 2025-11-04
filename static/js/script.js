@@ -18,10 +18,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let bingoSelectedCells = [];
     let shadowSelectedCells = [];
     let mirrorSelectedCells = [];
-    let deformationSelectedIndex = null;
     let squiggleSelectedIndex = null;
-    let adversarialSelectedIndex = null;
     let spookyGridSelectedCells = [];
+    let storyboardOrder = [];
+    let storyboardSelectedIndices = [];
     let squiggleRevealTimeout = null;
     let colorCipherRevealTimeout = null;
     let redDotTimeout = null;
@@ -46,9 +46,9 @@ document.addEventListener('DOMContentLoaded', () => {
         bingoSelectedCells = [];
         shadowSelectedCells = [];
         mirrorSelectedCells = [];
-        deformationSelectedIndex = null;
         squiggleSelectedIndex = null;
-        adversarialSelectedIndex = null;
+        storyboardOrder = [];
+        storyboardSelectedIndices = [];
         if (squiggleRevealTimeout) {
             clearTimeout(squiggleRevealTimeout);
             squiggleRevealTimeout = null;
@@ -103,16 +103,14 @@ document.addEventListener('DOMContentLoaded', () => {
             '.shadow-submit',
             '.mirror-layout',
             '.mirror-submit',
-            '.deformation-layout',
-            '.deformation-submit',
             '.squiggle-preview',
             '.squiggle-options-grid',
             '.squiggle-submit',
             '.color-cipher-preview',
             '.color-cipher-question',
             '.red-dot-area',
-            '.adversarial-options-container',
-            '.trajectory-gif-container'
+            '.trajectory-gif-container',
+            '.storyboard-logic-container'
         ];
 
         customSelectors.forEach((selector) => {
@@ -264,9 +262,6 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'mirror_select':
                 setupMirrorSelect(data);
                 break;
-            case 'deformation_select':
-                setupDeformationSelect(data);
-                break;
             case 'squiggle_select':
                 setupSquiggleSelect(data);
                 break;
@@ -279,8 +274,8 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'spooky_size_click':
                 setupSpookySizeClick(data);
                 break;
-            case 'adversarial_select':
-                setupAdversarialSelect(data);
+            case 'storyboard_logic':
+                setupStoryboardLogic(data);
                 break;
             case 'circle_grid_select':
             case 'circle_grid_direction_select':
@@ -511,6 +506,191 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         puzzleImageContainer.appendChild(clickArea);
+        puzzleImageContainer.style.display = 'block';
+    }
+
+    function setupStoryboardLogic(data) {
+        if (inputGroup) {
+            inputGroup.style.display = 'none';
+        }
+        submitBtn.style.display = 'none';
+
+        // Initialize order: start with shuffled order to make it interesting
+        const images = data.images || [];
+        if (!images.length) {
+            showError('No storyboard images available.');
+            return;
+        }
+
+        // Start with images in random order (for challenge)
+        storyboardOrder = Array.from({ length: images.length }, (_, i) => i);
+        // Shuffle the order
+        for (let i = storyboardOrder.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [storyboardOrder[i], storyboardOrder[j]] = [storyboardOrder[j], storyboardOrder[i]];
+        }
+
+        // Reset selection
+        storyboardSelectedIndices = [];
+
+        const container = document.createElement('div');
+        container.className = 'storyboard-logic-container';
+        container.style.display = 'flex';
+        container.style.flexDirection = 'column';
+        container.style.alignItems = 'center';
+        container.style.gap = '20px';
+        container.style.margin = '20px auto';
+        container.style.maxWidth = '900px';
+
+        const instruction = document.createElement('div');
+        instruction.style.fontSize = '16px';
+        instruction.style.fontWeight = '500';
+        instruction.style.marginBottom = '10px';
+        instruction.style.textAlign = 'center';
+        instruction.textContent = 'Click two images to swap their positions. Arrange them in the correct story sequence.';
+        container.appendChild(instruction);
+
+        const imageRow = document.createElement('div');
+        imageRow.style.display = 'flex';
+        imageRow.style.gap = '15px';
+        imageRow.style.justifyContent = 'center';
+        imageRow.style.flexWrap = 'nowrap';
+        imageRow.style.width = '100%';
+        imageRow.style.alignItems = 'flex-start';
+
+        const renderImages = () => {
+            imageRow.innerHTML = '';
+            storyboardOrder.forEach((imageIndex, position) => {
+                const imageWrapper = document.createElement('div');
+                imageWrapper.style.position = 'relative';
+                imageWrapper.style.display = 'flex';
+                imageWrapper.style.flexDirection = 'column';
+                imageWrapper.style.alignItems = 'center';
+                imageWrapper.style.cursor = 'pointer';
+                imageWrapper.style.transition = 'transform 0.2s';
+                imageWrapper.dataset.index = imageIndex;
+                imageWrapper.dataset.position = position;
+
+                const positionLabel = document.createElement('div');
+                positionLabel.style.position = 'absolute';
+                positionLabel.style.top = '-25px';
+                positionLabel.style.fontSize = '14px';
+                positionLabel.style.fontWeight = '600';
+                positionLabel.style.color = '#0078ff';
+                positionLabel.textContent = `${position + 1}`;
+                imageWrapper.appendChild(positionLabel);
+
+                const img = document.createElement('img');
+                img.src = images[imageIndex];
+                img.alt = `Storyboard image ${imageIndex + 1}`;
+                img.style.width = '250px';
+                img.style.height = 'auto';
+                img.style.maxWidth = '250px';
+                img.style.minWidth = '200px';
+                img.style.flexShrink = '0';
+                img.style.border = 'none';
+                img.style.borderRadius = '8px';
+                img.draggable = false;
+                imageWrapper.appendChild(img);
+
+                // Set initial border styling
+                imageWrapper.style.border = '3px solid #333';
+                imageWrapper.style.borderRadius = '8px';
+                imageWrapper.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+                imageWrapper.style.padding = '0';
+                
+                // Check if this position is selected
+                const isSelected = storyboardSelectedIndices.includes(position);
+                if (isSelected) {
+                    imageWrapper.style.border = '3px solid #0078ff';
+                    imageWrapper.style.boxShadow = '0 0 0 3px rgba(0, 120, 255, 0.3), 0 2px 8px rgba(0,0,0,0.1)';
+                }
+
+                imageWrapper.addEventListener('click', () => {
+                    const clickedPosition = position;
+                    
+                    // If already selected, deselect it
+                    if (storyboardSelectedIndices.includes(clickedPosition)) {
+                        storyboardSelectedIndices = storyboardSelectedIndices.filter(idx => idx !== clickedPosition);
+                        renderImages();
+                        return;
+                    }
+                    
+                    // If no selection yet, select this position
+                    if (storyboardSelectedIndices.length === 0) {
+                        storyboardSelectedIndices.push(clickedPosition);
+                        renderImages();
+                        return;
+                    }
+                    
+                    // If one position is already selected, swap with this one
+                    if (storyboardSelectedIndices.length === 1) {
+                        const firstPos = storyboardSelectedIndices[0];
+                        const secondPos = clickedPosition;
+                        
+                        // Swap the images at these positions
+                        const temp = storyboardOrder[firstPos];
+                        storyboardOrder[firstPos] = storyboardOrder[secondPos];
+                        storyboardOrder[secondPos] = temp;
+                        
+                        // Clear selection
+                        storyboardSelectedIndices = [];
+                        renderImages();
+                    }
+                });
+
+                imageWrapper.addEventListener('mouseenter', () => {
+                    if (!storyboardSelectedIndices.includes(position)) {
+                        imageWrapper.style.transform = 'scale(1.05)';
+                    }
+                });
+
+                imageWrapper.addEventListener('mouseleave', () => {
+                    imageWrapper.style.transform = 'scale(1)';
+                });
+
+                imageRow.appendChild(imageWrapper);
+            });
+        };
+
+        renderImages();
+        container.appendChild(imageRow);
+
+        const submitSection = document.createElement('div');
+        submitSection.style.marginTop = '20px';
+
+        const storyboardSubmitBtn = document.createElement('button');
+        storyboardSubmitBtn.textContent = 'Submit Order';
+        storyboardSubmitBtn.className = 'submit-storyboard';
+        storyboardSubmitBtn.style.padding = '12px 24px';
+        storyboardSubmitBtn.style.fontSize = '16px';
+        storyboardSubmitBtn.style.fontWeight = '600';
+        storyboardSubmitBtn.style.backgroundColor = '#0078ff';
+        storyboardSubmitBtn.style.color = 'white';
+        storyboardSubmitBtn.style.border = 'none';
+        storyboardSubmitBtn.style.borderRadius = '6px';
+        storyboardSubmitBtn.style.cursor = 'pointer';
+        storyboardSubmitBtn.style.transition = 'background-color 0.2s';
+        storyboardSubmitBtn.type = 'button';
+
+        storyboardSubmitBtn.addEventListener('mouseenter', () => {
+            storyboardSubmitBtn.style.backgroundColor = '#0056b3';
+        });
+
+        storyboardSubmitBtn.addEventListener('mouseleave', () => {
+            storyboardSubmitBtn.style.backgroundColor = '#0078ff';
+        });
+
+        storyboardSubmitBtn.addEventListener('click', () => {
+            storyboardSubmitBtn.disabled = true;
+            storyboardSubmitBtn.textContent = 'Processing...';
+            submitAnswer();
+        });
+
+        submitSection.appendChild(storyboardSubmitBtn);
+        container.appendChild(submitSection);
+
+        puzzleImageContainer.appendChild(container);
         puzzleImageContainer.style.display = 'block';
     }
 
@@ -1060,169 +1240,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function setupDeformationSelect(data) {
-        if (inputGroup) {
-            inputGroup.style.display = 'none';
-        }
-        submitBtn.style.display = 'none';
-
-        deformationSelectedIndex = null;
-
-        const layout = document.createElement('div');
-        layout.className = 'deformation-layout';
-
-        const referenceSection = document.createElement('div');
-        referenceSection.className = 'deformation-reference';
-
-        const referenceLabel = document.createElement('div');
-        referenceLabel.className = 'deformation-reference-label';
-        referenceLabel.textContent = 'Reference';
-        referenceSection.appendChild(referenceLabel);
-
-        const referenceImg = document.createElement('img');
-        referenceImg.src = data.reference_image;
-        referenceImg.alt = 'Reference deformation setup';
-        referenceImg.draggable = false;
-        referenceSection.appendChild(referenceImg);
-
-        const optionsSection = document.createElement('div');
-        optionsSection.className = 'deformation-options';
-
-        const optionsLabel = document.createElement('div');
-        optionsLabel.className = 'deformation-options-label';
-        optionsLabel.textContent = 'Select the correct deformation';
-        optionsSection.appendChild(optionsLabel);
-
-        const optionsGrid = document.createElement('div');
-        optionsGrid.className = 'deformation-options-grid';
-
-        const optionImages = data.option_images || [];
-        if (!optionImages.length) {
-            showError('No deformation options available.');
-            return;
-        }
-
-        const gridSize = data.grid_size || [2, Math.ceil(optionImages.length / 2)];
-        const cols = gridSize[1] || optionImages.length || 1;
-        optionsGrid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
-
-        optionImages.forEach((src, index) => {
-            const cell = document.createElement('div');
-            cell.className = 'deformation-option';
-            cell.dataset.index = index;
-
-            const img = document.createElement('img');
-            img.src = src;
-            img.alt = `Deformation option ${index + 1}`;
-            img.draggable = false;
-            cell.appendChild(img);
-
-            const overlay = document.createElement('div');
-            overlay.className = 'deformation-overlay';
-            cell.appendChild(overlay);
-
-            const badge = document.createElement('div');
-            badge.className = 'deformation-checkmark';
-            badge.textContent = '✓';
-            cell.appendChild(badge);
-
-            cell.addEventListener('click', () => selectDeformationOption(index, cell));
-
-            optionsGrid.appendChild(cell);
-        });
-
-        optionsSection.appendChild(optionsGrid);
-        layout.appendChild(referenceSection);
-        layout.appendChild(optionsSection);
-        puzzleImageContainer.appendChild(layout);
-
-        const submitSection = document.createElement('div');
-        submitSection.className = 'deformation-submit';
-
-        const deformationSubmitBtn = document.createElement('button');
-        deformationSubmitBtn.textContent = 'Submit';
-        deformationSubmitBtn.className = 'submit-deformation';
-        deformationSubmitBtn.type = 'button';
-        deformationSubmitBtn.addEventListener('click', () => {
-            if (deformationSelectedIndex === null) {
-                showError('Select one deformation before submitting.');
-                return;
-            }
-            deformationSubmitBtn.disabled = true;
-            deformationSubmitBtn.textContent = 'Processing...';
-            submitAnswer();
-        });
-
-        submitSection.appendChild(deformationSubmitBtn);
-        puzzleImageContainer.appendChild(submitSection);
-    }
-
-    function setupAdversarialSelect(data) {
-        if (inputGroup) {
-            inputGroup.style.display = 'none';
-        }
-        submitBtn.style.display = 'none';
-
-        adversarialSelectedIndex = null;
-
-        // Show the puzzle image first
-        renderPuzzleMedia(data);
-
-        // Create options container
-        const optionsContainer = document.createElement('div');
-        optionsContainer.className = 'adversarial-options-container';
-
-        const optionsLabel = document.createElement('div');
-        optionsLabel.className = 'adversarial-options-label';
-        optionsLabel.textContent = 'Select your answer:';
-        optionsContainer.appendChild(optionsLabel);
-
-        const optionsList = document.createElement('div');
-        optionsList.className = 'adversarial-options-list';
-
-        const options = data.options || [];
-        if (!options.length) {
-            showError('No options available for this puzzle.');
-            return;
-        }
-
-        options.forEach((optionText, index) => {
-            const optionButton = document.createElement('button');
-            optionButton.className = 'adversarial-option-button';
-            optionButton.type = 'button';
-            optionButton.textContent = optionText;
-            optionButton.dataset.index = index;
-
-            optionButton.addEventListener('click', () => {
-                // Prevent multiple clicks
-                if (adversarialSelectedIndex !== null) {
-                    return;
-                }
-
-                // Mark as selected
-                adversarialSelectedIndex = index;
-
-                // Visual feedback - disable all buttons and highlight selected
-                const allButtons = optionsList.querySelectorAll('.adversarial-option-button');
-                allButtons.forEach((btn) => {
-                    btn.disabled = true;
-                    if (parseInt(btn.dataset.index) === index) {
-                        btn.classList.add('selected');
-                    } else {
-                        btn.classList.add('disabled');
-                    }
-                });
-
-                // Auto-submit immediately
-                submitAnswer();
-            });
-
-            optionsList.appendChild(optionButton);
-        });
-
-        optionsContainer.appendChild(optionsList);
-        puzzleImageContainer.appendChild(optionsContainer);
-    }
 
     function setupSquiggleSelect(data) {
         if (inputGroup) {
@@ -1425,45 +1442,6 @@ document.addEventListener('DOMContentLoaded', () => {
         submitRedDotAttempt(payload);
     }
 
-    function selectDeformationOption(index, cellElement) {
-        if (deformationSelectedIndex === index) {
-            deformationSelectedIndex = null;
-            const overlay = cellElement.querySelector('.deformation-overlay');
-            const badge = cellElement.querySelector('.deformation-checkmark');
-            if (overlay) {
-                overlay.classList.remove('active');
-            }
-            if (badge) {
-                badge.classList.remove('active');
-            }
-            cellElement.classList.remove('active');
-            return;
-        }
-
-        const previouslyActive = document.querySelector('.deformation-option.active');
-        if (previouslyActive) {
-            previouslyActive.classList.remove('active');
-            const previousOverlay = previouslyActive.querySelector('.deformation-overlay');
-            const previousBadge = previouslyActive.querySelector('.deformation-checkmark');
-            if (previousOverlay) {
-                previousOverlay.classList.remove('active');
-            }
-            if (previousBadge) {
-                previousBadge.classList.remove('active');
-            }
-        }
-
-        deformationSelectedIndex = index;
-        const overlay = cellElement.querySelector('.deformation-overlay');
-        const badge = cellElement.querySelector('.deformation-checkmark');
-        if (overlay) {
-            overlay.classList.add('active');
-        }
-        if (badge) {
-            badge.classList.add('active');
-        }
-        cellElement.classList.add('active');
-    }
     function toggleMirrorSelection(index, cellElement) {
         const overlay = cellElement.querySelector('.mirror-overlay');
         const badge = cellElement.querySelector('.mirror-checkmark');
@@ -1538,26 +1516,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
                 break;
-            case 'deformation_select':
-                answerData.answer = deformationSelectedIndex;
-                if (deformationSelectedIndex === null) {
-                    showError('Select one deformation before submitting.');
-                    resetCustomSubmitButtons();
-                    return;
-                }
-                break;
             case 'squiggle_select':
                 answerData.answer = squiggleSelectedIndex;
                 if (squiggleSelectedIndex === null) {
                     showError('Select the squiggle that matches the preview.');
-                    resetCustomSubmitButtons();
-                    return;
-                }
-                break;
-            case 'adversarial_select':
-                answerData.answer = adversarialSelectedIndex;
-                if (adversarialSelectedIndex === null) {
-                    showError('Select an option before submitting.');
                     resetCustomSubmitButtons();
                     return;
                 }
@@ -1581,6 +1543,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 answerData.answer = spookyGridSelectedCells;
                 if (!spookyGridSelectedCells.length) {
                     showError('Select at least one cell before submitting.');
+                    resetCustomSubmitButtons();
+                    return;
+                }
+                break;
+            case 'storyboard_logic':
+                answerData.answer = storyboardOrder;
+                if (!storyboardOrder || storyboardOrder.length === 0) {
+                    showError('Please arrange the images before submitting.');
                     resetCustomSubmitButtons();
                     return;
                 }
@@ -1664,16 +1634,16 @@ document.addEventListener('DOMContentLoaded', () => {
             mirrorButton.textContent = 'Submit';
         }
 
-        const deformationButton = document.querySelector('.submit-deformation');
-        if (deformationButton) {
-            deformationButton.disabled = false;
-            deformationButton.textContent = 'Submit';
-        }
-
         const squiggleButton = document.querySelector('.submit-squiggle');
         if (squiggleButton) {
             squiggleButton.disabled = false;
             squiggleButton.textContent = 'Submit';
+        }
+
+        const storyboardButton = document.querySelector('.submit-storyboard');
+        if (storyboardButton) {
+            storyboardButton.disabled = false;
+            storyboardButton.textContent = 'Submit Order';
         }
     }
 
@@ -1709,12 +1679,10 @@ document.addEventListener('DOMContentLoaded', () => {
             Bingo: 3,
             Shadow_Plausible: 4,
             Mirror: 4,
-            Deformation: 4,
             Squiggle: 4,
             Color_Cipher: 3,
             Red_Dot: 4,
-            Vision_Ilusion: 3,
-            Adversarial: 3
+            Storyboard_Logic: 3,
         };
 
         const difficulty = difficultyRatings[puzzleType] || 1;

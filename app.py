@@ -16,22 +16,20 @@ recent_types = []
 MAX_RECENT_TYPES = 5
 
 PUZZLE_TYPE_SEQUENCE = [
-    #'Dice_Count',
-    #'Shadow_Plausible',
-    #'Mirror',
-    #'Squiggle',
-    #'Color_Cipher',
-    #'Color_Counting',
-    'Trajectory_Recovery',
-    'Spooky_Size',
-    #'Spooky_Circle_Grid_Direction',
-    #'Deformation',
-    #'Spooky_Circle',
-    #'Spooky_Circle_Grid',
-    #'Spooky_Shape_Grid',
-    #'Spooky_Text',
+    # 'Dice_Count',
+    # 'Shadow_Plausible',
+    # 'Mirror',
+    # 'Squiggle',
+    # 'Color_Cipher',
+    # 'Color_Counting',
+    # 'Trajectory_Recovery',
+    # 'Spooky_Size',
+    # 'Spooky_Circle',
+    # 'Spooky_Circle_Grid',
+    # 'Spooky_Shape_Grid',
+    # 'Spooky_Text',
     # 'Red_Dot',
-    #'Adversarial'
+    'Storyboard_Logic',
 ]
 sequential_index = 0
 
@@ -439,18 +437,6 @@ def get_puzzle():
             "prompt",
             "Select all mirror images that do not match the reference object."
         )
-    elif puzzle_type == "Deformation":
-        prompt = ground_truth[selected_puzzle].get(
-            "prompt",
-            "If I release the objects in the left image, choose the right image that shows the correct deformation."
-        )
-    elif puzzle_type == "Vision_Ilusion":
-        prompt = ground_truth[selected_puzzle].get(
-            "prompt",
-            "How many circles can you see in the animation?"
-        )
-        if not media_type:
-            media_type = "video"
     elif puzzle_type == "Spooky_Circle":
         prompt = ground_truth[selected_puzzle].get(
             "prompt",
@@ -479,10 +465,10 @@ def get_puzzle():
         )
         if not media_type:
             media_type = "gif"
-    elif puzzle_type == "Adversarial":
+    elif puzzle_type == "Storyboard_Logic":
         prompt = ground_truth[selected_puzzle].get(
             "prompt",
-            "What is the main object in this image?"
+            "Reorder the images to show the story in the correct causal sequence"
         )
     else:
         prompt = ground_truth[selected_puzzle].get("prompt", "Solve the CAPTCHA puzzle")
@@ -497,12 +483,8 @@ def get_puzzle():
         input_type = "shadow_plausible"
     elif puzzle_type == "Mirror":
         input_type = "mirror_select"
-    elif puzzle_type == "Deformation":
-        input_type = "deformation_select"
     elif puzzle_type == "Squiggle":
         input_type = "squiggle_select"
-    elif puzzle_type == "Vision_Ilusion":
-        input_type = "number"
     elif puzzle_type == "Spooky_Circle":
         input_type = "number"
     elif puzzle_type == "Spooky_Circle_Grid":
@@ -519,9 +501,8 @@ def get_puzzle():
         input_type = "color_counting_select"
     elif puzzle_type == "Trajectory_Recovery":
         input_type = "trajectory_recovery_select"
-    elif puzzle_type == "Adversarial":
-        input_type = "adversarial_select"
-
+    elif puzzle_type == "Storyboard_Logic":
+        input_type = "storyboard_logic"
     
     # For Rotation_Match, include additional data needed for the interface
     additional_data = {}
@@ -557,18 +538,6 @@ def get_puzzle():
             "option_images": [f'/captcha_data/{puzzle_type}/{img}' for img in option_images],
             "grid_size": ground_truth[selected_puzzle].get("grid_size", []),
             "answer": ground_truth[selected_puzzle].get("answer", [])
-        }
-    elif puzzle_type == "Deformation":
-        reference_image = ground_truth[selected_puzzle].get("reference")
-        option_images = ground_truth[selected_puzzle].get("options", [])
-        if not reference_image or not option_images:
-            return jsonify({'error': f'Invalid deformation data: {selected_puzzle}'}), 500
-
-        additional_data = {
-            "reference_image": f'/captcha_data/{puzzle_type}/{reference_image}',
-            "option_images": [f'/captcha_data/{puzzle_type}/{img}' for img in option_images],
-            "grid_size": ground_truth[selected_puzzle].get("grid_size", [2, 2]),
-            "answer": ground_truth[selected_puzzle].get("answer")
         }
     elif puzzle_type == "Squiggle":
         reference_image = ground_truth[selected_puzzle].get("reference")
@@ -638,26 +607,20 @@ def get_puzzle():
             "grid_size": ground_truth[selected_puzzle].get("grid_size", [4, 4]),
             "answer": ground_truth[selected_puzzle].get("answer", [])
         }
-    elif puzzle_type == "Adversarial":
-        options = ground_truth[selected_puzzle].get("options", [])
-        if not options:
-            return jsonify({'error': f'Invalid adversarial data: {selected_puzzle}'}), 500
+    elif puzzle_type == "Storyboard_Logic":
+        images = ground_truth[selected_puzzle].get("images", [])
+        if not images:
+            return jsonify({'error': f'Invalid Storyboard_Logic data: {selected_puzzle}'}), 500
 
         additional_data = {
-            "options": options,
-            "answer": ground_truth[selected_puzzle].get("answer")
+            "images": [f'/captcha_data/{puzzle_type}/{img}' for img in images],
+            "answer": ground_truth[selected_puzzle].get("answer", [])
         }
     else:
         prompt = ground_truth[selected_puzzle].get("prompt", "Solve the CAPTCHA puzzle")
 
     image_path = None
-    if puzzle_type not in ("Rotation_Match", "Shadow_Plausible", "Mirror", "Deformation", "Squiggle", "Spooky_Circle_Grid", "Spooky_Circle_Grid_Direction", "Spooky_Shape_Grid", "Color_Cipher", "Color_Counting", "Trajectory_Recovery", "Adversarial"):
-        image_path = f'/captcha_data/{puzzle_type}/{selected_puzzle}'
-        if not media_type:
-            media_type = "image"
-        if not media_path:
-            media_path = image_path
-    elif puzzle_type == "Adversarial":
+    if puzzle_type not in ("Rotation_Match", "Shadow_Plausible", "Mirror",  "Squiggle", "Spooky_Circle_Grid", "Spooky_Circle_Grid_Direction", "Spooky_Shape_Grid", "Color_Cipher", "Color_Counting", "Trajectory_Recovery", "Storyboard_Logic"):
         image_path = f'/captcha_data/{puzzle_type}/{selected_puzzle}'
         if not media_type:
             media_type = "image"
@@ -779,14 +742,6 @@ def check_answer():
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid answer format for Mirror'}), 400
 
-    elif puzzle_type == 'Deformation':
-        try:
-            correct_index = int(ground_truth[puzzle_id].get('answer'))
-            user_index = int(user_answer)
-            is_correct = user_index == correct_index
-            correct_answer_info = correct_index
-        except (ValueError, TypeError):
-            return jsonify({'error': 'Invalid answer format for Deformation'}), 400
     elif puzzle_type == 'Squiggle':
         try:
             correct_index = int(ground_truth[puzzle_id].get('answer'))
@@ -795,22 +750,6 @@ def check_answer():
             correct_answer_info = correct_index
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid answer format for Squiggle'}), 400
-    elif puzzle_type == 'Adversarial':
-        try:
-            correct_index = int(ground_truth[puzzle_id].get('answer'))
-            user_index = int(user_answer)
-            is_correct = user_index == correct_index
-            correct_answer_info = correct_index
-        except (ValueError, TypeError):
-            return jsonify({'error': 'Invalid answer format for Adversarial'}), 400
-    elif puzzle_type == 'Vision_Ilusion':
-        try:
-            correct_value = int(ground_truth[puzzle_id].get('answer'))
-            user_value = int(user_answer)
-            is_correct = user_value == correct_value
-            correct_answer_info = correct_value
-        except (ValueError, TypeError):
-            return jsonify({'error': 'Invalid answer format for Vision_Ilusion'}), 400
     elif puzzle_type == 'Spooky_Circle':
         try:
             correct_value = int(ground_truth[puzzle_id].get('answer'))
@@ -859,6 +798,15 @@ def check_answer():
             correct_answer_info = correct_indices
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid answer format for Trajectory_Recovery'}), 400
+    elif puzzle_type == 'Storyboard_Logic':
+        try:
+            # For Storyboard_Logic, order matters - check exact sequence match
+            correct_order = ground_truth[puzzle_id].get('answer', [])
+            user_order = [int(idx) for idx in user_answer]
+            is_correct = user_order == correct_order
+            correct_answer_info = correct_order
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid answer format for Storyboard_Logic'}), 400
     elif puzzle_type == 'Spooky_Size':
         state = active_spooky_size_puzzles.get(puzzle_id)
         if state is None:
@@ -1017,19 +965,19 @@ def check_answer():
             correct_payload = f'Completed {hits_done}/{hits_required} hits.'
         else:
             correct_payload = 'Click the red dot before it disappears.'
-    elif puzzle_type == 'Adversarial':
-        # Return the option text, not just the index
-        options = ground_truth[puzzle_id].get('options', [])
-        if isinstance(correct_answer_info, int) and 0 <= correct_answer_info < len(options):
-            correct_payload = options[correct_answer_info]
-        else:
-            correct_payload = ground_truth[puzzle_id].get('answer')
     elif puzzle_type == 'Spooky_Size':
         # Spooky_Size uses dynamic puzzle IDs, return validation details
         if isinstance(correct_answer_info, dict):
             correct_payload = f"Target at ({correct_answer_info['target_x']:.0f}, {correct_answer_info['target_y']:.0f}), radius {correct_answer_info['radius']:.0f}px"
         else:
             correct_payload = "Click validation details"
+    elif puzzle_type == 'Storyboard_Logic':
+        # Format the correct order as a readable sequence
+        if isinstance(correct_answer_info, list):
+            order_names = [f"Image {i+1}" for i in correct_answer_info]
+            correct_payload = f"Correct order: {' → '.join(order_names)}"
+        else:
+            correct_payload = ground_truth[puzzle_id].get(answer_key)
     else:
         correct_payload = ground_truth[puzzle_id].get(answer_key)
 
