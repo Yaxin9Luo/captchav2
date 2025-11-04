@@ -39,8 +39,12 @@ uv sync
 # Run the application
 uv run app.py
 
-# Test the Browser-Use framework agents
-uv run browseruse-cli --url http://127.0.0.1:7860 --llm browser-use --model gpt-5-2025-08-07
+### Use uv to run code so you do not have to activate virtual env everytime.
+# Test the Browser-Use framework default agents (Their in house model BU1.0)
+uv run agent_frameworks/browseruse_cli.py --url http://127.0.0.1:7860 --llm browser-use 
+
+# Test with other models (e.x. openai gpt5 here)
+uv run agent_frameworks/browseruse_cli.py --url http://127.0.0.1:7860 --llm openai --model gpt-5-2025-08-07
 ```
 
 ### Using pip

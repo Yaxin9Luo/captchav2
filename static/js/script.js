@@ -18,10 +18,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let bingoSelectedCells = [];
     let shadowSelectedCells = [];
     let mirrorSelectedCells = [];
-    let deformationSelectedIndex = null;
     let squiggleSelectedIndex = null;
-    let adversarialSelectedIndex = null;
     let spookyGridSelectedCells = [];
+    let storyboardOrder = [];
+    let storyboardSelectedIndices = [];
+    let jigsawPlacements = [];
     let squiggleRevealTimeout = null;
     let colorCipherRevealTimeout = null;
     let redDotTimeout = null;
@@ -30,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let redDotRequiredHits = 0;
     let redDotTimeoutDuration = 2000;
     let redDotElement = null;
+    let spookySizeAnswered = false;
 
     submitBtn.addEventListener('click', submitAnswer);
     userAnswerInput.addEventListener('keypress', (event) => {
@@ -45,9 +47,10 @@ document.addEventListener('DOMContentLoaded', () => {
         bingoSelectedCells = [];
         shadowSelectedCells = [];
         mirrorSelectedCells = [];
-        deformationSelectedIndex = null;
         squiggleSelectedIndex = null;
-        adversarialSelectedIndex = null;
+        storyboardOrder = [];
+        storyboardSelectedIndices = [];
+        jigsawPlacements = [];
         if (squiggleRevealTimeout) {
             clearTimeout(squiggleRevealTimeout);
             squiggleRevealTimeout = null;
@@ -65,6 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
         redDotRequiredHits = 0;
         redDotTimeoutDuration = 2000;
         redDotElement = null;
+        spookySizeAnswered = false;
 
         if (inputGroup) {
             inputGroup.style.display = 'flex';
@@ -101,15 +105,15 @@ document.addEventListener('DOMContentLoaded', () => {
             '.shadow-submit',
             '.mirror-layout',
             '.mirror-submit',
-            '.deformation-layout',
-            '.deformation-submit',
             '.squiggle-preview',
             '.squiggle-options-grid',
             '.squiggle-submit',
             '.color-cipher-preview',
             '.color-cipher-question',
             '.red-dot-area',
-            '.adversarial-options-container'
+            '.trajectory-gif-container',
+            '.storyboard-logic-container',
+            '.jigsaw-puzzle-container'
         ];
 
         customSelectors.forEach((selector) => {
@@ -261,9 +265,6 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'mirror_select':
                 setupMirrorSelect(data);
                 break;
-            case 'deformation_select':
-                setupDeformationSelect(data);
-                break;
             case 'squiggle_select':
                 setupSquiggleSelect(data);
                 break;
@@ -273,13 +274,20 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'red_dot_click':
                 setupRedDotClick(data);
                 break;
-            case 'adversarial_select':
-                setupAdversarialSelect(data);
+            case 'spooky_size_click':
+                setupSpookySizeClick(data);
+                break;
+            case 'storyboard_logic':
+                setupStoryboardLogic(data);
+                break;
+            case 'jigsaw_puzzle':
+                setupJigsawPuzzle(data);
                 break;
             case 'circle_grid_select':
             case 'circle_grid_direction_select':
             case 'shape_grid_select':
             case 'color_counting_select':
+            case 'trajectory_recovery_select':
                 setupSpookyGridSelect(data);
                 break;
             default:
@@ -378,6 +386,657 @@ document.addEventListener('DOMContentLoaded', () => {
             resultMessage.textContent = `Click the red dot before it disappears! (${redDotHits}/${redDotRequiredHits})`;
         }
         resultMessage.className = 'result-message instruction';
+    }
+
+    function setupSpookySizeClick(data) {
+        if (inputGroup) {
+            inputGroup.style.display = 'none';
+        }
+        submitBtn.style.display = 'none';
+
+        const canvasWidth = data.canvas_width || 600;
+        const canvasHeight = data.canvas_height || 400;
+
+        // Create clickable canvas overlay for the GIF
+        const clickArea = document.createElement('div');
+        clickArea.className = 'spooky-size-click-area';
+        clickArea.style.width = `${canvasWidth}px`;
+        clickArea.style.height = `${canvasHeight}px`;
+        clickArea.style.position = 'relative';
+        clickArea.style.margin = '0 auto';
+        clickArea.style.cursor = 'crosshair';
+        clickArea.style.border = '2px solid #333';
+        clickArea.style.backgroundColor = '#000';
+
+        // Add the GIF as background or img element
+        const gifImg = document.createElement('img');
+        gifImg.src = data.media_path;
+        gifImg.alt = 'Spooky Size Puzzle';
+        gifImg.style.width = '100%';
+        gifImg.style.height = '100%';
+        gifImg.style.display = 'block';
+        gifImg.style.pointerEvents = 'none'; // Let clicks pass through to parent
+
+        clickArea.appendChild(gifImg);
+
+        // Handle click
+        clickArea.addEventListener('click', (event) => {
+            if (spookySizeAnswered) {
+                return;
+            }
+
+            const rect = clickArea.getBoundingClientRect();
+            const clickX = event.clientX - rect.left;
+            const clickY = event.clientY - rect.top;
+
+            // Visual feedback
+            const marker = document.createElement('div');
+            marker.style.position = 'absolute';
+            marker.style.left = `${clickX}px`;
+            marker.style.top = `${clickY}px`;
+            marker.style.width = '20px';
+            marker.style.height = '20px';
+            marker.style.marginLeft = '-10px';
+            marker.style.marginTop = '-10px';
+            marker.style.borderRadius = '50%';
+            marker.style.border = '3px solid #0078ff';
+            marker.style.backgroundColor = 'rgba(0, 120, 255, 0.3)';
+            marker.style.pointerEvents = 'none';
+            clickArea.appendChild(marker);
+
+            // Disable further clicks
+            clickArea.style.pointerEvents = 'none';
+            spookySizeAnswered = true;
+
+            // Submit answer
+            const answerData = {
+                puzzle_type: currentPuzzle.puzzle_type,
+                puzzle_id: currentPuzzle.puzzle_id,
+                answer: {
+                    position: {
+                        x: Number(clickX.toFixed(2)),
+                        y: Number(clickY.toFixed(2))
+                    }
+                }
+            };
+            answerData.elapsed_time = ((Date.now() - (puzzleStartTime || Date.now())) / 1000).toFixed(2);
+
+            fetch('/api/check_answer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(answerData)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => {
+                        throw new Error(err.error || `HTTP error! status: ${response.status}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(result => {
+                if (result.error) {
+                    throw new Error(result.error);
+                }
+
+                benchmarkStats.total += 1;
+
+                if (result.correct) {
+                    benchmarkStats.correct += 1;
+                    resultMessage.textContent = 'Correct! You clicked the right shape.';
+                    resultMessage.className = 'result-message correct';
+                    createFireworks();
+                } else {
+                    resultMessage.textContent = 'Incorrect. Try the next puzzle.';
+                    resultMessage.className = 'result-message incorrect';
+                    createSadFace();
+                }
+
+                updateStats();
+                recordBenchmarkResult({
+                    puzzle_type: currentPuzzle.puzzle_type,
+                    puzzle_id: currentPuzzle.puzzle_id,
+                    user_answer: answerData.answer,
+                    correct_answer: result.correct_answer,
+                    correct: result.correct,
+                    elapsed_time: answerData.elapsed_time
+                });
+
+                setTimeout(() => loadNewPuzzle(), 2000);
+            })
+            .catch(error => {
+                console.error('Error submitting answer:', error);
+                resultMessage.textContent = `Error: ${error.message || 'Error submitting answer.'}`;
+                resultMessage.className = 'result-message incorrect';
+            });
+        });
+
+        puzzleImageContainer.appendChild(clickArea);
+        puzzleImageContainer.style.display = 'block';
+    }
+
+    function setupStoryboardLogic(data) {
+        if (inputGroup) {
+            inputGroup.style.display = 'none';
+        }
+        submitBtn.style.display = 'none';
+
+        // Initialize order: start with shuffled order to make it interesting
+        const images = data.images || [];
+        if (!images.length) {
+            showError('No storyboard images available.');
+            return;
+        }
+
+        // Start with images in random order (for challenge)
+        storyboardOrder = Array.from({ length: images.length }, (_, i) => i);
+        // Shuffle the order
+        for (let i = storyboardOrder.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [storyboardOrder[i], storyboardOrder[j]] = [storyboardOrder[j], storyboardOrder[i]];
+        }
+
+        // Reset selection
+        storyboardSelectedIndices = [];
+
+        const container = document.createElement('div');
+        container.className = 'storyboard-logic-container';
+        container.style.display = 'flex';
+        container.style.flexDirection = 'column';
+        container.style.alignItems = 'center';
+        container.style.gap = '20px';
+        container.style.margin = '20px auto';
+        container.style.maxWidth = '900px';
+
+        const instruction = document.createElement('div');
+        instruction.style.fontSize = '16px';
+        instruction.style.fontWeight = '500';
+        instruction.style.marginBottom = '10px';
+        instruction.style.textAlign = 'center';
+        instruction.textContent = 'Click two images to swap their positions. Arrange them in the correct story sequence.';
+        container.appendChild(instruction);
+
+        const imageRow = document.createElement('div');
+        imageRow.style.display = 'flex';
+        imageRow.style.gap = '15px';
+        imageRow.style.justifyContent = 'center';
+        imageRow.style.flexWrap = 'nowrap';
+        imageRow.style.width = '100%';
+        imageRow.style.alignItems = 'flex-start';
+
+        const renderImages = () => {
+            imageRow.innerHTML = '';
+            storyboardOrder.forEach((imageIndex, position) => {
+                const imageWrapper = document.createElement('div');
+                imageWrapper.style.position = 'relative';
+                imageWrapper.style.display = 'flex';
+                imageWrapper.style.flexDirection = 'column';
+                imageWrapper.style.alignItems = 'center';
+                imageWrapper.style.cursor = 'pointer';
+                imageWrapper.style.transition = 'transform 0.2s';
+                imageWrapper.dataset.index = imageIndex;
+                imageWrapper.dataset.position = position;
+
+                const positionLabel = document.createElement('div');
+                positionLabel.style.position = 'absolute';
+                positionLabel.style.top = '-25px';
+                positionLabel.style.fontSize = '14px';
+                positionLabel.style.fontWeight = '600';
+                positionLabel.style.color = '#0078ff';
+                positionLabel.textContent = `${position + 1}`;
+                imageWrapper.appendChild(positionLabel);
+
+                const img = document.createElement('img');
+                img.src = images[imageIndex];
+                img.alt = `Storyboard image ${imageIndex + 1}`;
+                img.style.width = '250px';
+                img.style.height = 'auto';
+                img.style.maxWidth = '250px';
+                img.style.minWidth = '200px';
+                img.style.flexShrink = '0';
+                img.style.border = 'none';
+                img.style.borderRadius = '8px';
+                img.draggable = false;
+                imageWrapper.appendChild(img);
+
+                // Set initial border styling
+                imageWrapper.style.border = '3px solid #333';
+                imageWrapper.style.borderRadius = '8px';
+                imageWrapper.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+                imageWrapper.style.padding = '0';
+                
+                // Check if this position is selected
+                const isSelected = storyboardSelectedIndices.includes(position);
+                if (isSelected) {
+                    imageWrapper.style.border = '3px solid #0078ff';
+                    imageWrapper.style.boxShadow = '0 0 0 3px rgba(0, 120, 255, 0.3), 0 2px 8px rgba(0,0,0,0.1)';
+                }
+
+                imageWrapper.addEventListener('click', () => {
+                    const clickedPosition = position;
+                    
+                    // If already selected, deselect it
+                    if (storyboardSelectedIndices.includes(clickedPosition)) {
+                        storyboardSelectedIndices = storyboardSelectedIndices.filter(idx => idx !== clickedPosition);
+                        renderImages();
+                        return;
+                    }
+                    
+                    // If no selection yet, select this position
+                    if (storyboardSelectedIndices.length === 0) {
+                        storyboardSelectedIndices.push(clickedPosition);
+                        renderImages();
+                        return;
+                    }
+                    
+                    // If one position is already selected, swap with this one
+                    if (storyboardSelectedIndices.length === 1) {
+                        const firstPos = storyboardSelectedIndices[0];
+                        const secondPos = clickedPosition;
+                        
+                        // Swap the images at these positions
+                        const temp = storyboardOrder[firstPos];
+                        storyboardOrder[firstPos] = storyboardOrder[secondPos];
+                        storyboardOrder[secondPos] = temp;
+                        
+                        // Clear selection
+                        storyboardSelectedIndices = [];
+                        renderImages();
+                    }
+                });
+
+                imageWrapper.addEventListener('mouseenter', () => {
+                    if (!storyboardSelectedIndices.includes(position)) {
+                        imageWrapper.style.transform = 'scale(1.05)';
+                    }
+                });
+
+                imageWrapper.addEventListener('mouseleave', () => {
+                    imageWrapper.style.transform = 'scale(1)';
+                });
+
+                imageRow.appendChild(imageWrapper);
+            });
+        };
+
+        renderImages();
+        container.appendChild(imageRow);
+
+        const submitSection = document.createElement('div');
+        submitSection.style.marginTop = '20px';
+
+        const storyboardSubmitBtn = document.createElement('button');
+        storyboardSubmitBtn.textContent = 'Submit Order';
+        storyboardSubmitBtn.className = 'submit-storyboard';
+        storyboardSubmitBtn.style.padding = '12px 24px';
+        storyboardSubmitBtn.style.fontSize = '16px';
+        storyboardSubmitBtn.style.fontWeight = '600';
+        storyboardSubmitBtn.style.backgroundColor = '#0078ff';
+        storyboardSubmitBtn.style.color = 'white';
+        storyboardSubmitBtn.style.border = 'none';
+        storyboardSubmitBtn.style.borderRadius = '6px';
+        storyboardSubmitBtn.style.cursor = 'pointer';
+        storyboardSubmitBtn.style.transition = 'background-color 0.2s';
+        storyboardSubmitBtn.type = 'button';
+
+        storyboardSubmitBtn.addEventListener('mouseenter', () => {
+            storyboardSubmitBtn.style.backgroundColor = '#0056b3';
+        });
+
+        storyboardSubmitBtn.addEventListener('mouseleave', () => {
+            storyboardSubmitBtn.style.backgroundColor = '#0078ff';
+        });
+
+        storyboardSubmitBtn.addEventListener('click', () => {
+            storyboardSubmitBtn.disabled = true;
+            storyboardSubmitBtn.textContent = 'Processing...';
+            submitAnswer();
+        });
+
+        submitSection.appendChild(storyboardSubmitBtn);
+        container.appendChild(submitSection);
+
+        puzzleImageContainer.appendChild(container);
+        puzzleImageContainer.style.display = 'block';
+    }
+
+    function setupJigsawPuzzle(data) {
+        if (inputGroup) {
+            inputGroup.style.display = 'none';
+        }
+        submitBtn.style.display = 'none';
+
+        const pieces = data.pieces || [];
+        const gridSize = data.grid_size || [2, 2];
+        const pieceSize = data.piece_size || 150;
+        const correctPositions = data.correct_positions || [];
+        const referenceImage = data.reference_image;
+
+        if (!pieces.length) {
+            showError('No puzzle pieces available.');
+            return;
+        }
+
+        // Initialize placements - all pieces start unplaced
+        jigsawPlacements = [];
+
+        const container = document.createElement('div');
+        container.className = 'jigsaw-puzzle-container';
+        container.style.display = 'flex';
+        container.style.flexDirection = 'column';
+        container.style.alignItems = 'center';
+        container.style.gap = '20px';
+        container.style.margin = '20px auto';
+        container.style.maxWidth = '900px';
+
+        // Reference image (optional hint)
+        if (referenceImage) {
+            const referenceSection = document.createElement('div');
+            referenceSection.style.textAlign = 'center';
+            referenceSection.style.marginBottom = '10px';
+            
+            const referenceLabel = document.createElement('div');
+            referenceLabel.style.fontSize = '14px';
+            referenceLabel.style.fontWeight = '500';
+            referenceLabel.style.marginBottom = '5px';
+            referenceLabel.textContent = 'Reference image:';
+            referenceSection.appendChild(referenceLabel);
+
+            const refImg = document.createElement('img');
+            refImg.src = referenceImage;
+            refImg.alt = 'Jigsaw puzzle reference';
+            refImg.style.maxWidth = `${pieceSize * gridSize[1]}px`;
+            refImg.style.height = 'auto';
+            refImg.style.border = '2px solid #333';
+            refImg.style.borderRadius = '8px';
+            refImg.style.opacity = '0.7';
+            refImg.draggable = false;
+            referenceSection.appendChild(refImg);
+            container.appendChild(referenceSection);
+        }
+
+        // Puzzle grid area
+        const gridContainer = document.createElement('div');
+        gridContainer.style.display = 'grid';
+        gridContainer.style.gridTemplateColumns = `repeat(${gridSize[1]}, ${pieceSize}px)`;
+        gridContainer.style.gridTemplateRows = `repeat(${gridSize[0]}, ${pieceSize}px)`;
+        gridContainer.style.gap = '2px';
+        gridContainer.style.border = '3px solid #333';
+        gridContainer.style.padding = '5px';
+        gridContainer.style.backgroundColor = '#f0f0f0';
+        gridContainer.style.borderRadius = '8px';
+        gridContainer.id = 'jigsaw-grid';
+
+        // Create grid cells
+        const gridCells = [];
+        for (let row = 0; row < gridSize[0]; row++) {
+            for (let col = 0; col < gridSize[1]; col++) {
+                const cell = document.createElement('div');
+                cell.className = 'jigsaw-grid-cell';
+                cell.dataset.row = row;
+                cell.dataset.col = col;
+                cell.style.width = `${pieceSize}px`;
+                cell.style.height = `${pieceSize}px`;
+                cell.style.border = '2px dashed #ccc';
+                cell.style.borderRadius = '4px';
+                cell.style.backgroundColor = '#fff';
+                cell.style.display = 'flex';
+                cell.style.alignItems = 'center';
+                cell.style.justifyContent = 'center';
+                cell.style.position = 'relative';
+                cell.style.transition = 'background-color 0.2s';
+
+                // Drop zone
+                cell.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    if (!cell.querySelector('.jigsaw-piece')) {
+                        cell.style.backgroundColor = '#e8f4f8';
+                    }
+                });
+
+                cell.addEventListener('dragleave', () => {
+                    if (!cell.querySelector('.jigsaw-piece')) {
+                        cell.style.backgroundColor = '#fff';
+                    }
+                });
+
+                cell.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    cell.style.backgroundColor = '#fff';
+                    
+                    const pieceIndex = parseInt(e.dataTransfer.getData('text/plain'));
+                    const row = parseInt(cell.dataset.row);
+                    const col = parseInt(cell.dataset.col);
+                    
+                    // If cell already has a piece, don't replace it
+                    if (cell.querySelector('.jigsaw-piece')) {
+                        return;
+                    }
+                    
+                    // Find existing placement for this piece
+                    const existingPlacementIdx = jigsawPlacements.findIndex(p => p.piece_index === pieceIndex);
+                    
+                    // If piece was already placed in a different cell, clear that cell
+                    if (existingPlacementIdx !== -1) {
+                        const oldPlacement = jigsawPlacements[existingPlacementIdx];
+                        const oldRow = parseInt(oldPlacement.grid_row);
+                        const oldCol = parseInt(oldPlacement.grid_col);
+                        // Only clear if it's a different cell
+                        if (oldRow !== row || oldCol !== col) {
+                            const oldCell = document.querySelector(`.jigsaw-grid-cell[data-row="${oldRow}"][data-col="${oldCol}"]`);
+                            if (oldCell && oldCell !== cell) {
+                                oldCell.innerHTML = '';
+                            }
+                            // Update the placement to new position
+                            jigsawPlacements[existingPlacementIdx] = {
+                                piece_index: pieceIndex,
+                                grid_row: row,
+                                grid_col: col
+                            };
+                        } else {
+                            // Same cell, no change needed
+                            return;
+                        }
+                    } else {
+                        // New placement - add to array
+                        jigsawPlacements.push({
+                            piece_index: pieceIndex,
+                            grid_row: row,
+                            grid_col: col
+                        });
+                    }
+                    
+                    // Remove piece from tray if it was there
+                    const trayPiece = document.querySelector(`.jigsaw-tray-piece[data-piece-index="${pieceIndex}"]`);
+                    if (trayPiece) {
+                        trayPiece.remove();
+                    }
+                    
+                    // Place piece in this cell
+                    const pieceImg = document.createElement('img');
+                    pieceImg.src = pieces[pieceIndex];
+                    pieceImg.className = 'jigsaw-piece';
+                    pieceImg.style.width = '100%';
+                    pieceImg.style.height = '100%';
+                    pieceImg.style.objectFit = 'contain';
+                    pieceImg.draggable = true;
+                    pieceImg.dataset.pieceIndex = pieceIndex;
+                    
+                    // Clear cell and add piece
+                    cell.innerHTML = '';
+                    cell.appendChild(pieceImg);
+                    
+                    // Make piece draggable again
+                    pieceImg.addEventListener('dragstart', (e) => {
+                        e.dataTransfer.setData('text/plain', pieceIndex.toString());
+                        e.dataTransfer.effectAllowed = 'move';
+                    });
+                    
+                    // Allow removing piece by dragging to tray
+                    pieceImg.addEventListener('dragend', (e) => {
+                        // Check if dropped outside grid
+                        setTimeout(() => {
+                            const dropTarget = document.elementFromPoint(e.clientX, e.clientY);
+                            if (!dropTarget?.closest('.jigsaw-grid-cell')) {
+                                // Return to tray - remove from cell
+                                cell.innerHTML = '';
+                                const placementIdx = jigsawPlacements.findIndex(p => p.piece_index === pieceIndex);
+                                if (placementIdx !== -1) {
+                                    jigsawPlacements.splice(placementIdx, 1);
+                                }
+                                renderPieces();
+                            }
+                        }, 100);
+                    });
+                });
+
+                gridContainer.appendChild(cell);
+                gridCells.push(cell);
+            }
+        }
+
+        container.appendChild(gridContainer);
+
+        // Pieces tray
+        const trayContainer = document.createElement('div');
+        trayContainer.className = 'jigsaw-tray';
+        trayContainer.style.display = 'flex';
+        trayContainer.style.flexWrap = 'wrap';
+        trayContainer.style.gap = '10px';
+        trayContainer.style.justifyContent = 'center';
+        trayContainer.style.marginTop = '20px';
+        trayContainer.style.padding = '15px';
+        trayContainer.style.border = '2px dashed #ccc';
+        trayContainer.style.borderRadius = '8px';
+        trayContainer.style.backgroundColor = '#fafafa';
+        trayContainer.style.minHeight = '100px';
+
+        const trayLabel = document.createElement('div');
+        trayLabel.style.width = '100%';
+        trayLabel.style.textAlign = 'center';
+        trayLabel.style.fontSize = '14px';
+        trayLabel.style.fontWeight = '500';
+        trayLabel.style.marginBottom = '10px';
+        trayLabel.textContent = 'Drag pieces from here to the grid above';
+        trayContainer.appendChild(trayLabel);
+
+        const renderPieces = () => {
+            // Clear tray
+            const existingPieces = trayContainer.querySelectorAll('.jigsaw-tray-piece');
+            existingPieces.forEach(p => p.remove());
+
+            // Show pieces that are not placed
+            const placedPieceIndices = new Set(jigsawPlacements.map(p => p.piece_index));
+            
+            pieces.forEach((pieceSrc, index) => {
+                if (!placedPieceIndices.has(index)) {
+                    const pieceWrapper = document.createElement('div');
+                    pieceWrapper.className = 'jigsaw-tray-piece';
+                    pieceWrapper.dataset.pieceIndex = index;
+                    pieceWrapper.style.width = `${pieceSize * 0.6}px`;
+                    pieceWrapper.style.height = `${pieceSize * 0.6}px`;
+                    pieceWrapper.style.cursor = 'grab';
+                    pieceWrapper.style.border = '2px solid #333';
+                    pieceWrapper.style.borderRadius = '4px';
+                    pieceWrapper.style.overflow = 'hidden';
+                    pieceWrapper.style.transition = 'transform 0.2s';
+                    pieceWrapper.style.backgroundColor = '#fff';
+
+                    const pieceImg = document.createElement('img');
+                    pieceImg.src = pieceSrc;
+                    pieceImg.style.width = '100%';
+                    pieceImg.style.height = '100%';
+                    pieceImg.style.objectFit = 'contain';
+                    pieceImg.draggable = true;
+                    pieceImg.dataset.pieceIndex = index;
+
+                    pieceWrapper.appendChild(pieceImg);
+                    trayContainer.appendChild(pieceWrapper);
+
+                    pieceImg.addEventListener('dragstart', (e) => {
+                        e.dataTransfer.setData('text/plain', index.toString());
+                        e.dataTransfer.effectAllowed = 'move';
+                        pieceWrapper.style.opacity = '0.5';
+                    });
+
+                    pieceImg.addEventListener('dragend', () => {
+                        pieceWrapper.style.opacity = '1';
+                    });
+
+                    pieceWrapper.addEventListener('mouseenter', () => {
+                        pieceWrapper.style.transform = 'scale(1.1)';
+                    });
+
+                    pieceWrapper.addEventListener('mouseleave', () => {
+                        pieceWrapper.style.transform = 'scale(1)';
+                    });
+                }
+            });
+        };
+
+        renderPieces();
+        container.appendChild(trayContainer);
+
+        // Submit button
+        const submitSection = document.createElement('div');
+        submitSection.style.marginTop = '20px';
+
+        const jigsawSubmitBtn = document.createElement('button');
+        jigsawSubmitBtn.textContent = 'Submit Puzzle';
+        jigsawSubmitBtn.className = 'submit-jigsaw';
+        jigsawSubmitBtn.style.padding = '12px 24px';
+        jigsawSubmitBtn.style.fontSize = '16px';
+        jigsawSubmitBtn.style.fontWeight = '600';
+        jigsawSubmitBtn.style.backgroundColor = '#0078ff';
+        jigsawSubmitBtn.style.color = 'white';
+        jigsawSubmitBtn.style.border = 'none';
+        jigsawSubmitBtn.style.borderRadius = '6px';
+        jigsawSubmitBtn.style.cursor = 'pointer';
+        jigsawSubmitBtn.style.transition = 'background-color 0.2s';
+        jigsawSubmitBtn.type = 'button';
+
+        jigsawSubmitBtn.addEventListener('mouseenter', () => {
+            jigsawSubmitBtn.style.backgroundColor = '#0056b3';
+        });
+
+        jigsawSubmitBtn.addEventListener('mouseleave', () => {
+            jigsawSubmitBtn.style.backgroundColor = '#0078ff';
+        });
+
+        jigsawSubmitBtn.addEventListener('click', () => {
+            // Ensure all pieces are placed
+            const placedIndices = new Set(jigsawPlacements.map(p => p.piece_index));
+            if (jigsawPlacements.length !== pieces.length || placedIndices.size !== pieces.length) {
+                showError(`Please place all ${pieces.length} puzzle pieces before submitting. Currently placed: ${jigsawPlacements.length}`);
+                return;
+            }
+            
+            // Validate that all placements have valid coordinates
+            const invalidPlacements = jigsawPlacements.filter(p => 
+                p.piece_index === undefined || 
+                p.grid_row === undefined || 
+                p.grid_col === undefined ||
+                isNaN(p.piece_index) ||
+                isNaN(p.grid_row) ||
+                isNaN(p.grid_col)
+            );
+            
+            if (invalidPlacements.length > 0) {
+                console.error('Invalid placements detected:', invalidPlacements);
+                showError('Some puzzle pieces have invalid positions. Please try again.');
+                return;
+            }
+            
+            jigsawSubmitBtn.disabled = true;
+            jigsawSubmitBtn.textContent = 'Processing...';
+            submitAnswer();
+        });
+
+        submitSection.appendChild(jigsawSubmitBtn);
+        container.appendChild(submitSection);
+
+        puzzleImageContainer.appendChild(container);
+        puzzleImageContainer.style.display = 'block';
     }
 
     function configureNumberPuzzle(data) {
@@ -790,6 +1449,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         submitBtn.style.display = 'none';
 
+        // Make sure result message is visible (it's inside inputGroup)
+        if (resultMessage) {
+            resultMessage.style.display = 'block';
+            resultMessage.style.position = 'relative';
+            resultMessage.style.marginTop = '20px';
+        }
+
         spookyGridSelectedCells = [];
 
         puzzleImageContainer.style.display = 'block';
@@ -797,12 +1463,37 @@ document.addEventListener('DOMContentLoaded', () => {
         puzzleImageContainer.style.maxWidth = '960px';
         puzzleImageContainer.style.margin = '0 auto';
 
+        // For Trajectory_Recovery, show the movement GIF above the grid
+        if (data.puzzle_type === 'Trajectory_Recovery' && data.movement_gif) {
+            const gifContainer = document.createElement('div');
+            gifContainer.className = 'trajectory-gif-container';
+            gifContainer.style.textAlign = 'center';
+            gifContainer.style.marginBottom = '20px';
+
+            const gifImg = document.createElement('img');
+            gifImg.src = data.movement_gif;
+            gifImg.alt = 'Ball movement trajectory';
+            gifImg.style.maxWidth = '400px';
+            gifImg.style.width = '100%';
+            gifImg.style.border = '2px solid #333';
+            gifImg.style.borderRadius = '8px';
+            gifImg.draggable = false;
+
+            gifContainer.appendChild(gifImg);
+            puzzleImageContainer.appendChild(gifContainer);
+        }
+
         const gridContainer = document.createElement('div');
         gridContainer.className = 'spooky-grid-container';
 
         // Add special class for Color_Counting to have white background
         if (data.puzzle_type === 'Color_Counting') {
             gridContainer.classList.add('color-counting-grid');
+        }
+
+        // Add special class for Trajectory_Recovery
+        if (data.puzzle_type === 'Trajectory_Recovery') {
+            gridContainer.classList.add('trajectory-recovery-grid');
         }
 
         const optionImages = data.option_images || [];
@@ -894,169 +1585,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function setupDeformationSelect(data) {
-        if (inputGroup) {
-            inputGroup.style.display = 'none';
-        }
-        submitBtn.style.display = 'none';
-
-        deformationSelectedIndex = null;
-
-        const layout = document.createElement('div');
-        layout.className = 'deformation-layout';
-
-        const referenceSection = document.createElement('div');
-        referenceSection.className = 'deformation-reference';
-
-        const referenceLabel = document.createElement('div');
-        referenceLabel.className = 'deformation-reference-label';
-        referenceLabel.textContent = 'Reference';
-        referenceSection.appendChild(referenceLabel);
-
-        const referenceImg = document.createElement('img');
-        referenceImg.src = data.reference_image;
-        referenceImg.alt = 'Reference deformation setup';
-        referenceImg.draggable = false;
-        referenceSection.appendChild(referenceImg);
-
-        const optionsSection = document.createElement('div');
-        optionsSection.className = 'deformation-options';
-
-        const optionsLabel = document.createElement('div');
-        optionsLabel.className = 'deformation-options-label';
-        optionsLabel.textContent = 'Select the correct deformation';
-        optionsSection.appendChild(optionsLabel);
-
-        const optionsGrid = document.createElement('div');
-        optionsGrid.className = 'deformation-options-grid';
-
-        const optionImages = data.option_images || [];
-        if (!optionImages.length) {
-            showError('No deformation options available.');
-            return;
-        }
-
-        const gridSize = data.grid_size || [2, Math.ceil(optionImages.length / 2)];
-        const cols = gridSize[1] || optionImages.length || 1;
-        optionsGrid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
-
-        optionImages.forEach((src, index) => {
-            const cell = document.createElement('div');
-            cell.className = 'deformation-option';
-            cell.dataset.index = index;
-
-            const img = document.createElement('img');
-            img.src = src;
-            img.alt = `Deformation option ${index + 1}`;
-            img.draggable = false;
-            cell.appendChild(img);
-
-            const overlay = document.createElement('div');
-            overlay.className = 'deformation-overlay';
-            cell.appendChild(overlay);
-
-            const badge = document.createElement('div');
-            badge.className = 'deformation-checkmark';
-            badge.textContent = '✓';
-            cell.appendChild(badge);
-
-            cell.addEventListener('click', () => selectDeformationOption(index, cell));
-
-            optionsGrid.appendChild(cell);
-        });
-
-        optionsSection.appendChild(optionsGrid);
-        layout.appendChild(referenceSection);
-        layout.appendChild(optionsSection);
-        puzzleImageContainer.appendChild(layout);
-
-        const submitSection = document.createElement('div');
-        submitSection.className = 'deformation-submit';
-
-        const deformationSubmitBtn = document.createElement('button');
-        deformationSubmitBtn.textContent = 'Submit';
-        deformationSubmitBtn.className = 'submit-deformation';
-        deformationSubmitBtn.type = 'button';
-        deformationSubmitBtn.addEventListener('click', () => {
-            if (deformationSelectedIndex === null) {
-                showError('Select one deformation before submitting.');
-                return;
-            }
-            deformationSubmitBtn.disabled = true;
-            deformationSubmitBtn.textContent = 'Processing...';
-            submitAnswer();
-        });
-
-        submitSection.appendChild(deformationSubmitBtn);
-        puzzleImageContainer.appendChild(submitSection);
-    }
-
-    function setupAdversarialSelect(data) {
-        if (inputGroup) {
-            inputGroup.style.display = 'none';
-        }
-        submitBtn.style.display = 'none';
-
-        adversarialSelectedIndex = null;
-
-        // Show the puzzle image first
-        renderPuzzleMedia(data);
-
-        // Create options container
-        const optionsContainer = document.createElement('div');
-        optionsContainer.className = 'adversarial-options-container';
-
-        const optionsLabel = document.createElement('div');
-        optionsLabel.className = 'adversarial-options-label';
-        optionsLabel.textContent = 'Select your answer:';
-        optionsContainer.appendChild(optionsLabel);
-
-        const optionsList = document.createElement('div');
-        optionsList.className = 'adversarial-options-list';
-
-        const options = data.options || [];
-        if (!options.length) {
-            showError('No options available for this puzzle.');
-            return;
-        }
-
-        options.forEach((optionText, index) => {
-            const optionButton = document.createElement('button');
-            optionButton.className = 'adversarial-option-button';
-            optionButton.type = 'button';
-            optionButton.textContent = optionText;
-            optionButton.dataset.index = index;
-
-            optionButton.addEventListener('click', () => {
-                // Prevent multiple clicks
-                if (adversarialSelectedIndex !== null) {
-                    return;
-                }
-
-                // Mark as selected
-                adversarialSelectedIndex = index;
-
-                // Visual feedback - disable all buttons and highlight selected
-                const allButtons = optionsList.querySelectorAll('.adversarial-option-button');
-                allButtons.forEach((btn) => {
-                    btn.disabled = true;
-                    if (parseInt(btn.dataset.index) === index) {
-                        btn.classList.add('selected');
-                    } else {
-                        btn.classList.add('disabled');
-                    }
-                });
-
-                // Auto-submit immediately
-                submitAnswer();
-            });
-
-            optionsList.appendChild(optionButton);
-        });
-
-        optionsContainer.appendChild(optionsList);
-        puzzleImageContainer.appendChild(optionsContainer);
-    }
 
     function setupSquiggleSelect(data) {
         if (inputGroup) {
@@ -1259,45 +1787,6 @@ document.addEventListener('DOMContentLoaded', () => {
         submitRedDotAttempt(payload);
     }
 
-    function selectDeformationOption(index, cellElement) {
-        if (deformationSelectedIndex === index) {
-            deformationSelectedIndex = null;
-            const overlay = cellElement.querySelector('.deformation-overlay');
-            const badge = cellElement.querySelector('.deformation-checkmark');
-            if (overlay) {
-                overlay.classList.remove('active');
-            }
-            if (badge) {
-                badge.classList.remove('active');
-            }
-            cellElement.classList.remove('active');
-            return;
-        }
-
-        const previouslyActive = document.querySelector('.deformation-option.active');
-        if (previouslyActive) {
-            previouslyActive.classList.remove('active');
-            const previousOverlay = previouslyActive.querySelector('.deformation-overlay');
-            const previousBadge = previouslyActive.querySelector('.deformation-checkmark');
-            if (previousOverlay) {
-                previousOverlay.classList.remove('active');
-            }
-            if (previousBadge) {
-                previousBadge.classList.remove('active');
-            }
-        }
-
-        deformationSelectedIndex = index;
-        const overlay = cellElement.querySelector('.deformation-overlay');
-        const badge = cellElement.querySelector('.deformation-checkmark');
-        if (overlay) {
-            overlay.classList.add('active');
-        }
-        if (badge) {
-            badge.classList.add('active');
-        }
-        cellElement.classList.add('active');
-    }
     function toggleMirrorSelection(index, cellElement) {
         const overlay = cellElement.querySelector('.mirror-overlay');
         const badge = cellElement.querySelector('.mirror-checkmark');
@@ -1372,26 +1861,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
                 break;
-            case 'deformation_select':
-                answerData.answer = deformationSelectedIndex;
-                if (deformationSelectedIndex === null) {
-                    showError('Select one deformation before submitting.');
-                    resetCustomSubmitButtons();
-                    return;
-                }
-                break;
             case 'squiggle_select':
                 answerData.answer = squiggleSelectedIndex;
                 if (squiggleSelectedIndex === null) {
                     showError('Select the squiggle that matches the preview.');
-                    resetCustomSubmitButtons();
-                    return;
-                }
-                break;
-            case 'adversarial_select':
-                answerData.answer = adversarialSelectedIndex;
-                if (adversarialSelectedIndex === null) {
-                    showError('Select an option before submitting.');
                     resetCustomSubmitButtons();
                     return;
                 }
@@ -1411,12 +1884,31 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'circle_grid_direction_select':
             case 'shape_grid_select':
             case 'color_counting_select':
+            case 'trajectory_recovery_select':
                 answerData.answer = spookyGridSelectedCells;
                 if (!spookyGridSelectedCells.length) {
                     showError('Select at least one cell before submitting.');
                     resetCustomSubmitButtons();
                     return;
                 }
+                break;
+            case 'storyboard_logic':
+                answerData.answer = storyboardOrder;
+                if (!storyboardOrder || storyboardOrder.length === 0) {
+                    showError('Please arrange the images before submitting.');
+                    resetCustomSubmitButtons();
+                    return;
+                }
+                break;
+            case 'jigsaw_puzzle':
+                answerData.answer = jigsawPlacements;
+                if (!jigsawPlacements || jigsawPlacements.length === 0) {
+                    showError('Please place at least one puzzle piece before submitting.');
+                    resetCustomSubmitButtons();
+                    return;
+                }
+                // Debug logging
+                console.log('Jigsaw placements being submitted:', JSON.stringify(jigsawPlacements, null, 2));
                 break;
             default:
                 answerData.answer = userAnswerInput.value.trim();
@@ -1443,6 +1935,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     throw new Error(data.error);
                 }
 
+                // Debug logging for jigsaw puzzles
+                if (currentPuzzle && currentPuzzle.input_type === 'jigsaw_puzzle') {
+                    console.log('Jigsaw validation response:', data);
+                    if (!data.correct && data.details) {
+                        console.log('Validation details:', data.details);
+                    }
+                }
+
                 benchmarkStats.total += 1;
                 if (data.correct) {
                     benchmarkStats.correct += 1;
@@ -1450,7 +1950,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     resultMessage.className = 'result-message correct';
                     createFireworks();
                 } else {
-                    resultMessage.textContent = 'Incorrect.';
+                    const errorMsg = data.correct_answer ? `Incorrect. ${data.correct_answer}` : 'Incorrect.';
+                    resultMessage.textContent = errorMsg;
                     resultMessage.className = 'result-message incorrect';
                     createSadFace();
                 }
@@ -1497,16 +1998,22 @@ document.addEventListener('DOMContentLoaded', () => {
             mirrorButton.textContent = 'Submit';
         }
 
-        const deformationButton = document.querySelector('.submit-deformation');
-        if (deformationButton) {
-            deformationButton.disabled = false;
-            deformationButton.textContent = 'Submit';
-        }
-
         const squiggleButton = document.querySelector('.submit-squiggle');
         if (squiggleButton) {
             squiggleButton.disabled = false;
             squiggleButton.textContent = 'Submit';
+        }
+
+        const storyboardButton = document.querySelector('.submit-storyboard');
+        if (storyboardButton) {
+            storyboardButton.disabled = false;
+            storyboardButton.textContent = 'Submit Order';
+        }
+
+        const jigsawButton = document.querySelector('.submit-jigsaw');
+        if (jigsawButton) {
+            jigsawButton.disabled = false;
+            jigsawButton.textContent = 'Submit Puzzle';
         }
     }
 
@@ -1542,12 +2049,11 @@ document.addEventListener('DOMContentLoaded', () => {
             Bingo: 3,
             Shadow_Plausible: 4,
             Mirror: 4,
-            Deformation: 4,
             Squiggle: 4,
             Color_Cipher: 3,
             Red_Dot: 4,
-            Vision_Ilusion: 3,
-            Adversarial: 3
+            Storyboard_Logic: 3,
+            Jigsaw_Puzzle: 2,
         };
 
         const difficulty = difficultyRatings[puzzleType] || 1;
