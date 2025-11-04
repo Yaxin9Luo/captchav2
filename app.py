@@ -29,7 +29,7 @@ PUZZLE_TYPE_SEQUENCE = [
     #'Spooky_Circle_Grid',
     #'Spooky_Shape_Grid',
     #'Spooky_Text',
-    'Red_Dot',
+    # 'Red_Dot',
     #'Adversarial'
 ]
 sequential_index = 0

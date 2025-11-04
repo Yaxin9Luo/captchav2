@@ -449,6 +449,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             };
+            answerData.elapsed_time = ((Date.now() - (puzzleStartTime || Date.now())) / 1000).toFixed(2);
 
             fetch('/api/check_answer', {
                 method: 'POST',
@@ -457,13 +458,29 @@ document.addEventListener('DOMContentLoaded', () => {
             })
             .then(response => response.json())
             .then(result => {
+                benchmarkStats.total += 1;
+
                 if (result.correct) {
+                    benchmarkStats.correct += 1;
                     resultMessage.textContent = 'Correct! You clicked the right shape.';
                     resultMessage.className = 'result-message correct';
+                    createFireworks();
                 } else {
                     resultMessage.textContent = 'Incorrect. Try the next puzzle.';
                     resultMessage.className = 'result-message incorrect';
+                    createSadFace();
                 }
+
+                updateStats();
+                recordBenchmarkResult({
+                    puzzle_type: currentPuzzle.puzzle_type,
+                    puzzle_id: currentPuzzle.puzzle_id,
+                    user_answer: answerData.answer,
+                    correct_answer: result.correct_answer,
+                    correct: result.correct,
+                    elapsed_time: answerData.elapsed_time
+                });
+
                 setTimeout(() => loadNewPuzzle(), 2000);
             })
             .catch(error => {
