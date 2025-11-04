@@ -111,7 +111,8 @@ document.addEventListener('DOMContentLoaded', () => {
             '.color-cipher-preview',
             '.color-cipher-question',
             '.red-dot-area',
-            '.adversarial-options-container'
+            '.adversarial-options-container',
+            '.trajectory-gif-container'
         ];
 
         customSelectors.forEach((selector) => {
@@ -285,6 +286,7 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'circle_grid_direction_select':
             case 'shape_grid_select':
             case 'color_counting_select':
+            case 'trajectory_recovery_select':
                 setupSpookyGridSelect(data);
                 break;
             default:
@@ -922,6 +924,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         submitBtn.style.display = 'none';
 
+        // Make sure result message is visible (it's inside inputGroup)
+        if (resultMessage) {
+            resultMessage.style.display = 'block';
+            resultMessage.style.position = 'relative';
+            resultMessage.style.marginTop = '20px';
+        }
+
         spookyGridSelectedCells = [];
 
         puzzleImageContainer.style.display = 'block';
@@ -929,12 +938,37 @@ document.addEventListener('DOMContentLoaded', () => {
         puzzleImageContainer.style.maxWidth = '960px';
         puzzleImageContainer.style.margin = '0 auto';
 
+        // For Trajectory_Recovery, show the movement GIF above the grid
+        if (data.puzzle_type === 'Trajectory_Recovery' && data.movement_gif) {
+            const gifContainer = document.createElement('div');
+            gifContainer.className = 'trajectory-gif-container';
+            gifContainer.style.textAlign = 'center';
+            gifContainer.style.marginBottom = '20px';
+
+            const gifImg = document.createElement('img');
+            gifImg.src = data.movement_gif;
+            gifImg.alt = 'Ball movement trajectory';
+            gifImg.style.maxWidth = '400px';
+            gifImg.style.width = '100%';
+            gifImg.style.border = '2px solid #333';
+            gifImg.style.borderRadius = '8px';
+            gifImg.draggable = false;
+
+            gifContainer.appendChild(gifImg);
+            puzzleImageContainer.appendChild(gifContainer);
+        }
+
         const gridContainer = document.createElement('div');
         gridContainer.className = 'spooky-grid-container';
 
         // Add special class for Color_Counting to have white background
         if (data.puzzle_type === 'Color_Counting') {
             gridContainer.classList.add('color-counting-grid');
+        }
+
+        // Add special class for Trajectory_Recovery
+        if (data.puzzle_type === 'Trajectory_Recovery') {
+            gridContainer.classList.add('trajectory-recovery-grid');
         }
 
         const optionImages = data.option_images || [];
@@ -1543,6 +1577,7 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'circle_grid_direction_select':
             case 'shape_grid_select':
             case 'color_counting_select':
+            case 'trajectory_recovery_select':
                 answerData.answer = spookyGridSelectedCells;
                 if (!spookyGridSelectedCells.length) {
                     showError('Select at least one cell before submitting.');
