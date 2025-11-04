@@ -1043,7 +1043,8 @@ def check_answer():
 
     
     # Validate input
-    if not puzzle_id or user_answer is None:
+    # For Jigsaw_Puzzle, allow None/empty answers to be handled gracefully (marked as incorrect)
+    if not puzzle_id or (user_answer is None and puzzle_type != 'Jigsaw_Puzzle'):
         return jsonify({'error': 'Missing puzzle_id or answer'}), 400
     
     ground_truth = load_ground_truth(puzzle_type)
@@ -1181,7 +1182,39 @@ def check_answer():
                     return jsonify({'error': 'Invalid puzzle ID'}), 400
                 correct_positions = ground_truth[puzzle_id].get('correct_positions', [])
             
-            user_placements = user_answer if isinstance(user_answer, list) else []
+            # Handle cases where agent submits directly without placing pieces
+            # If user_answer is None, empty list, or not a list, mark as incorrect immediately
+            if user_answer is None or not isinstance(user_answer, list) or len(user_answer) == 0:
+                is_correct = False
+                correct_answer_info = correct_positions
+                
+                # Clean up generated puzzle state after validation
+                if puzzle_state:
+                    active_jigsaw_puzzles.pop(puzzle_id, None)
+                
+                # Format the correct positions as a readable string
+                if isinstance(correct_answer_info, list):
+                    position_strs = []
+                    for pos in correct_answer_info:
+                        piece_idx = pos.get('piece_index', '?')
+                        row = pos.get('grid_row', '?')
+                        col = pos.get('grid_col', '?')
+                        position_strs.append(f"Piece {piece_idx} at ({row}, {col})")
+                    correct_payload = f"Correct positions: {'; '.join(position_strs)}"
+                else:
+                    correct_payload = "Puzzle completion details"
+                
+                return jsonify({
+                    'correct': False,
+                    'user_answer': user_answer,
+                    'correct_answer': correct_payload,
+                    'details': {
+                        'user_placements': user_answer if user_answer else [],
+                        'correct_positions': correct_answer_info
+                    }
+                })
+            
+            user_placements = user_answer
             
             # Convert user placements to a dictionary for easy lookup
             user_positions_dict = {}

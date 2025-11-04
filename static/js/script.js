@@ -1004,14 +1004,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         jigsawSubmitBtn.addEventListener('click', () => {
-            // Ensure all pieces are placed
-            const placedIndices = new Set(jigsawPlacements.map(p => p.piece_index));
-            if (jigsawPlacements.length !== pieces.length || placedIndices.size !== pieces.length) {
-                showError(`Please place all ${pieces.length} puzzle pieces before submitting. Currently placed: ${jigsawPlacements.length}`);
-                return;
-            }
-            
-            // Validate that all placements have valid coordinates
+            // Allow submission even if pieces aren't placed - backend will mark as incorrect
+            // Validate that all placements have valid coordinates (if any pieces are placed)
             const invalidPlacements = jigsawPlacements.filter(p => 
                 p.piece_index === undefined || 
                 p.grid_row === undefined || 
@@ -1021,10 +1015,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 isNaN(p.grid_col)
             );
             
-            if (invalidPlacements.length > 0) {
+            // If there are placements but they're invalid, warn but allow submission
+            if (invalidPlacements.length > 0 && jigsawPlacements.length > 0) {
                 console.error('Invalid placements detected:', invalidPlacements);
-                showError('Some puzzle pieces have invalid positions. Please try again.');
-                return;
+                // Still allow submission - backend will handle validation
             }
             
             jigsawSubmitBtn.disabled = true;
@@ -1901,12 +1895,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 break;
             case 'jigsaw_puzzle':
-                answerData.answer = jigsawPlacements;
-                if (!jigsawPlacements || jigsawPlacements.length === 0) {
-                    showError('Please place at least one puzzle piece before submitting.');
-                    resetCustomSubmitButtons();
-                    return;
-                }
+                // Allow empty submissions - backend will mark as incorrect
+                answerData.answer = jigsawPlacements || [];
                 // Debug logging
                 console.log('Jigsaw placements being submitted:', JSON.stringify(jigsawPlacements, null, 2));
                 break;
@@ -1966,6 +1956,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     elapsed_time: answerData.elapsed_time
                 });
 
+                // Reset custom submit buttons (including jigsaw) before loading new puzzle
+                resetCustomSubmitButtons();
+                
                 setTimeout(loadNewPuzzle, 2000);
             })
             .catch((error) => {
