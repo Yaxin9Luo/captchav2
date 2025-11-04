@@ -4,7 +4,14 @@ import random
 import uuid
 import time
 import math
-from flask import Flask, render_template, request, jsonify, send_from_directory
+import base64
+import io
+from flask import Flask, render_template, request, jsonify, send_from_directory, Response
+try:
+    from PIL import Image
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 
@@ -29,12 +36,14 @@ PUZZLE_TYPE_SEQUENCE = [
     # 'Spooky_Shape_Grid',
     # 'Spooky_Text',
     # 'Red_Dot',
-    'Storyboard_Logic',
+    # 'Storyboard_Logic',
+    'Jigsaw_Puzzle',
 ]
 sequential_index = 0
 
 active_red_dot_puzzles: dict[str, dict] = {}
 active_spooky_size_puzzles: dict[str, dict] = {}
+active_jigsaw_puzzles: dict[str, dict] = {}
 
 COLOR_SYMBOL_POOL = [
     ("🟥", "red"),
@@ -161,6 +170,298 @@ def evaluate_color_cipher(expression: str, mapping: list[dict]) -> float:
         idx += 2
 
     return result
+
+
+def generate_jigsaw_image(width: int, height: int) -> Image.Image:
+    """Generate a random image with diverse geometric shapes for jigsaw puzzle."""
+    if not PIL_AVAILABLE:
+        raise ValueError('PIL/Pillow is required for jigsaw puzzle generation')
+    
+    from PIL import ImageDraw
+    
+    img = Image.new('RGB', (width, height), color='white')
+    draw = ImageDraw.Draw(img)
+    
+    # Random light background color for contrast
+    bg_color = (random.randint(240, 255), random.randint(240, 255), random.randint(240, 255))
+    img.paste(bg_color, [0, 0, width, height])
+    
+    # Generate diverse geometric shapes - 5 to 10 shapes for variety
+    num_shapes = random.randint(5, 10)
+    shape_types = ['circle', 'rectangle', 'ellipse', 'polygon', 'triangle', 'star', 'rounded_rect', 'diamond', 'hexagon']
+    
+    # Track used positions to avoid too much overlap
+    used_positions = []
+    
+    for _ in range(num_shapes):
+        shape_type = random.choice(shape_types)
+        
+        # Random vibrant colors
+        color = (random.randint(60, 230), random.randint(60, 230), random.randint(60, 230))
+        
+        # Random size - ensure shapes are visible
+        size_factor = random.uniform(0.12, 0.35)  # 12% to 35% of image size
+        shape_width = int(width * size_factor)
+        shape_height = int(height * size_factor)
+        
+        # Try to place shape avoiding too much overlap
+        max_attempts = 10
+        for attempt in range(max_attempts):
+            center_x = random.randint(shape_width // 2, width - shape_width // 2)
+            center_y = random.randint(shape_height // 2, height - shape_height // 2)
+            
+            # Check if position is too close to existing shapes
+            too_close = False
+            for used_pos in used_positions:
+                dist = math.sqrt((center_x - used_pos[0])**2 + (center_y - used_pos[1])**2)
+                if dist < min(shape_width, shape_height):
+                    too_close = True
+                    break
+            
+            if not too_close or attempt == max_attempts - 1:
+                used_positions.append((center_x, center_y))
+                break
+        
+        # Draw the shape
+        if shape_type == 'circle':
+            radius = min(shape_width, shape_height) // 2
+            draw.ellipse([center_x - radius, center_y - radius,
+                         center_x + radius, center_y + radius],
+                        fill=color, outline=None)
+        
+        elif shape_type == 'rectangle':
+            x1 = center_x - shape_width // 2
+            y1 = center_y - shape_height // 2
+            x2 = center_x + shape_width // 2
+            y2 = center_y + shape_height // 2
+            # Random rotation angle for some rectangles
+            if random.random() < 0.3:  # 30% chance of rotation
+                angle = random.uniform(-math.pi/6, math.pi/6)
+                cos_a, sin_a = math.cos(angle), math.sin(angle)
+                w2, h2 = shape_width // 2, shape_height // 2
+                points = [
+                    (center_x + int(-w2*cos_a - h2*sin_a), center_y + int(-w2*sin_a + h2*cos_a)),
+                    (center_x + int(w2*cos_a - h2*sin_a), center_y + int(w2*sin_a + h2*cos_a)),
+                    (center_x + int(w2*cos_a + h2*sin_a), center_y + int(w2*sin_a - h2*cos_a)),
+                    (center_x + int(-w2*cos_a + h2*sin_a), center_y + int(-w2*sin_a - h2*cos_a))
+                ]
+                draw.polygon(points, fill=color, outline=None)
+            else:
+                draw.rectangle([x1, y1, x2, y2], fill=color, outline=None)
+        
+        elif shape_type == 'ellipse':
+            x1 = center_x - shape_width // 2
+            y1 = center_y - shape_height // 2
+            x2 = center_x + shape_width // 2
+            y2 = center_y + shape_height // 2
+            draw.ellipse([x1, y1, x2, y2], fill=color, outline=None)
+        
+        elif shape_type == 'rounded_rect':
+            x1 = center_x - shape_width // 2
+            y1 = center_y - shape_height // 2
+            x2 = center_x + shape_width // 2
+            y2 = center_y + shape_height // 2
+            corner_radius = min(shape_width, shape_height) // 4
+            # Draw rounded rectangle
+            draw.rectangle([x1 + corner_radius, y1, x2 - corner_radius, y2], fill=color)
+            draw.rectangle([x1, y1 + corner_radius, x2, y2 - corner_radius], fill=color)
+            draw.ellipse([x1, y1, x1 + corner_radius * 2, y1 + corner_radius * 2], fill=color)
+            draw.ellipse([x2 - corner_radius * 2, y1, x2, y1 + corner_radius * 2], fill=color)
+            draw.ellipse([x1, y2 - corner_radius * 2, x1 + corner_radius * 2, y2], fill=color)
+            draw.ellipse([x2 - corner_radius * 2, y2 - corner_radius * 2, x2, y2], fill=color)
+        
+        elif shape_type == 'triangle':
+            # Random triangle orientation
+            orientation = random.choice(['up', 'down', 'left', 'right'])
+            size = min(shape_width, shape_height) // 2
+            
+            if orientation == 'up':
+                points = [
+                    (center_x, center_y - size),
+                    (center_x - size, center_y + size),
+                    (center_x + size, center_y + size)
+                ]
+            elif orientation == 'down':
+                points = [
+                    (center_x, center_y + size),
+                    (center_x - size, center_y - size),
+                    (center_x + size, center_y - size)
+                ]
+            elif orientation == 'left':
+                points = [
+                    (center_x - size, center_y),
+                    (center_x + size, center_y - size),
+                    (center_x + size, center_y + size)
+                ]
+            else:  # right
+                points = [
+                    (center_x + size, center_y),
+                    (center_x - size, center_y - size),
+                    (center_x - size, center_y + size)
+                ]
+            draw.polygon(points, fill=color, outline=None)
+        
+        elif shape_type == 'polygon':
+            # Draw polygon with 5-8 sides
+            num_sides = random.randint(5, 8)
+            size = min(shape_width, shape_height) // 2
+            points = []
+            rotation = random.uniform(0, 2 * math.pi)
+            for i in range(num_sides):
+                angle = (2 * math.pi * i) / num_sides + rotation
+                px = center_x + int(size * math.cos(angle))
+                py = center_y + int(size * math.sin(angle))
+                points.append((px, py))
+            draw.polygon(points, fill=color, outline=None)
+        
+        elif shape_type == 'star':
+            # Draw a star (5-pointed or 6-pointed)
+            star_points = random.choice([5, 6])
+            outer_radius = min(shape_width, shape_height) // 2
+            inner_radius = int(outer_radius * random.uniform(0.35, 0.5))
+            points = []
+            rotation = random.uniform(0, 2 * math.pi)
+            for i in range(star_points * 2):
+                angle = (math.pi * i) / star_points + rotation - math.pi / 2
+                radius = outer_radius if i % 2 == 0 else inner_radius
+                px = center_x + int(radius * math.cos(angle))
+                py = center_y + int(radius * math.sin(angle))
+                points.append((px, py))
+            draw.polygon(points, fill=color, outline=None)
+        
+        elif shape_type == 'diamond':
+            # Draw diamond shape
+            size = min(shape_width, shape_height) // 2
+            points = [
+                (center_x, center_y - size),  # Top
+                (center_x + size, center_y),  # Right
+                (center_x, center_y + size),  # Bottom
+                (center_x - size, center_y)   # Left
+            ]
+            draw.polygon(points, fill=color, outline=None)
+        
+        elif shape_type == 'hexagon':
+            # Draw hexagon
+            size = min(shape_width, shape_height) // 2
+            rotation = random.uniform(0, math.pi / 3)
+            points = []
+            for i in range(6):
+                angle = (math.pi * i) / 3 + rotation
+                px = center_x + int(size * math.cos(angle))
+                py = center_y + int(size * math.sin(angle))
+                points.append((px, py))
+            draw.polygon(points, fill=color, outline=None)
+    
+    return img
+
+
+def generate_jigsaw_puzzle(config: dict) -> dict:
+    """Generate a random jigsaw puzzle by splitting an image into pieces."""
+    if not PIL_AVAILABLE:
+        raise ValueError('PIL/Pillow is required for jigsaw puzzle generation')
+    
+    # Get configuration
+    source_images_dir = config.get("source_images_dir", "captcha_data/Jigsaw_Puzzle/sources")
+    grid_rows = config.get("grid_rows", random.choice([2, 3]))
+    grid_cols = config.get("grid_cols", random.choice([2, 3]))
+    piece_size = config.get("piece_size", 150)
+    generate_image = config.get("generate_image", True)  # Default to generating images
+    
+    # Ensure we have at least 2x2 and at most 3x3 for easy human solving
+    grid_rows = max(2, min(grid_rows, 3))
+    grid_cols = max(2, min(grid_cols, 3))
+    
+    # Calculate target dimensions
+    target_width = grid_cols * piece_size
+    target_height = grid_rows * piece_size
+    
+    # Try to load from source images, or generate one
+    img = None
+    if not generate_image:
+        # Try to find source images
+        source_path = os.path.join(source_images_dir)
+        if not os.path.exists(source_path):
+            source_path = "captcha_data/Jigsaw_Puzzle"
+        
+        source_images = []
+        if os.path.exists(source_path):
+            for filename in os.listdir(source_path):
+                if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+                    if 'piece' not in filename.lower() and 'jigsaw' not in filename.lower():
+                        source_images.append(os.path.join(source_path, filename))
+        
+        if source_images:
+            source_image_path = random.choice(source_images)
+            img = Image.open(source_image_path)
+            img = img.convert('RGB')
+            img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
+    
+    # Generate image if no source image was found or if generation is enabled
+    if img is None:
+        img = generate_jigsaw_image(target_width, target_height)
+    
+    # Generate unique puzzle ID
+    puzzle_id = f"jigsaw_{int(time.time()*1000)}_{random.randint(1000,9999)}"
+    
+    # Split image into pieces
+    pieces_data = []
+    correct_positions = []
+    
+    for row in range(grid_rows):
+        for col in range(grid_cols):
+            # Calculate crop box
+            left = col * piece_size
+            top = row * piece_size
+            right = left + piece_size
+            bottom = top + piece_size
+            
+            # Crop piece
+            piece = img.crop((left, top, right, bottom))
+            
+            # Convert to base64 for embedding
+            buffered = io.BytesIO()
+            piece.save(buffered, format="PNG")
+            piece_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+            piece_data_url = f"data:image/png;base64,{piece_base64}"
+            
+            pieces_data.append(piece_data_url)
+            
+            # Store correct position
+            correct_positions.append({
+                "piece_index": len(pieces_data) - 1,
+                "grid_row": row,
+                "grid_col": col
+            })
+    
+    # Shuffle pieces for puzzle (pieces are shown in random order)
+    shuffled_indices = list(range(len(pieces_data)))
+    random.shuffle(shuffled_indices)
+    
+    # Store puzzle state
+    active_jigsaw_puzzles[puzzle_id] = {
+        "pieces_data": pieces_data,
+        "correct_positions": correct_positions,
+        "grid_size": [grid_rows, grid_cols],
+        "piece_size": piece_size,
+        "shuffled_indices": shuffled_indices,
+        "created_at": time.time()
+    }
+    
+    # Create reference image (full image) as base64
+    buffered = io.BytesIO()
+    img.save(buffered, format="PNG")
+    reference_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+    reference_data_url = f"data:image/png;base64,{reference_base64}"
+    
+    return {
+        "puzzle_id": puzzle_id,
+        "pieces": pieces_data,  # Return base64 data URLs
+        "grid_size": [grid_rows, grid_cols],
+        "piece_size": piece_size,
+        "correct_positions": correct_positions,
+        "reference_image": reference_data_url,
+        "prompt": "Drag the puzzle pieces to complete the jigsaw puzzle"
+    }
 
 
 def generate_red_dot(config: dict) -> dict:
@@ -470,6 +771,11 @@ def get_puzzle():
             "prompt",
             "Reorder the images to show the story in the correct causal sequence"
         )
+    elif puzzle_type == "Jigsaw_Puzzle":
+        prompt = ground_truth[selected_puzzle].get(
+            "prompt",
+            "Drag the puzzle pieces to complete the jigsaw puzzle"
+        )
     else:
         prompt = ground_truth[selected_puzzle].get("prompt", "Solve the CAPTCHA puzzle")
     
@@ -503,6 +809,8 @@ def get_puzzle():
         input_type = "trajectory_recovery_select"
     elif puzzle_type == "Storyboard_Logic":
         input_type = "storyboard_logic"
+    elif puzzle_type == "Jigsaw_Puzzle":
+        input_type = "jigsaw_puzzle"
     
     # For Rotation_Match, include additional data needed for the interface
     additional_data = {}
@@ -616,11 +924,63 @@ def get_puzzle():
             "images": [f'/captcha_data/{puzzle_type}/{img}' for img in images],
             "answer": ground_truth[selected_puzzle].get("answer", [])
         }
+    elif puzzle_type == "Jigsaw_Puzzle":
+        # Check if we should generate a random puzzle or use ground truth
+        use_generation = ground_truth.get("config", {}).get("generate_random", True)
+        
+        if use_generation and PIL_AVAILABLE:
+            # Generate random puzzle
+            try:
+                config = ground_truth.get("config", {})
+                puzzle = generate_jigsaw_puzzle(config)
+                puzzle_id = puzzle["puzzle_id"]
+                
+                additional_data = {
+                    "pieces": puzzle["pieces"],  # Base64 data URLs
+                    "grid_size": puzzle["grid_size"],
+                    "piece_size": puzzle["piece_size"],
+                    "correct_positions": puzzle["correct_positions"],
+                    "reference_image": puzzle["reference_image"]
+                }
+                
+                response_data = {
+                    'puzzle_type': puzzle_type,
+                    'image_path': None,
+                    'media_path': None,
+                    'media_type': None,
+                    'puzzle_id': puzzle_id,
+                    'prompt': puzzle["prompt"],
+                    'input_type': 'jigsaw_puzzle',
+                    'debug_info': f"Type: {puzzle_type}, Generated puzzle: {puzzle_id}"
+                }
+                response_data.update(additional_data)
+                return jsonify(response_data)
+            except Exception as e:
+                # Fall back to ground truth if generation fails
+                print(f"Jigsaw generation failed: {e}")
+        
+        # Use ground truth puzzles
+        pieces = ground_truth[selected_puzzle].get("pieces", [])
+        grid_size = ground_truth[selected_puzzle].get("grid_size", [2, 2])
+        piece_size = ground_truth[selected_puzzle].get("piece_size", 150)
+        correct_positions = ground_truth[selected_puzzle].get("correct_positions", [])
+        reference_image = ground_truth[selected_puzzle].get("image")
+        
+        if not pieces or not correct_positions:
+            return jsonify({'error': f'Invalid Jigsaw_Puzzle data: {selected_puzzle}'}), 500
+
+        additional_data = {
+            "pieces": [f'/captcha_data/{puzzle_type}/{piece}' for piece in pieces],
+            "grid_size": grid_size,
+            "piece_size": piece_size,
+            "correct_positions": correct_positions,
+            "reference_image": f'/captcha_data/{puzzle_type}/{reference_image}' if reference_image else None
+        }
     else:
         prompt = ground_truth[selected_puzzle].get("prompt", "Solve the CAPTCHA puzzle")
 
     image_path = None
-    if puzzle_type not in ("Rotation_Match", "Shadow_Plausible", "Mirror",  "Squiggle", "Spooky_Circle_Grid", "Spooky_Circle_Grid_Direction", "Spooky_Shape_Grid", "Color_Cipher", "Color_Counting", "Trajectory_Recovery", "Storyboard_Logic"):
+    if puzzle_type not in ("Rotation_Match", "Shadow_Plausible", "Mirror",  "Squiggle", "Spooky_Circle_Grid", "Spooky_Circle_Grid_Direction", "Spooky_Shape_Grid", "Color_Cipher", "Color_Counting", "Trajectory_Recovery", "Storyboard_Logic", "Jigsaw_Puzzle"):
         image_path = f'/captcha_data/{puzzle_type}/{selected_puzzle}'
         if not media_type:
             media_type = "image"
@@ -688,7 +1048,7 @@ def check_answer():
     
     ground_truth = load_ground_truth(puzzle_type)
     
-    if puzzle_type not in ('Color_Cipher', 'Red_Dot', 'Spooky_Size') and puzzle_id not in ground_truth:
+    if puzzle_type not in ('Color_Cipher', 'Red_Dot', 'Spooky_Size', 'Jigsaw_Puzzle') and puzzle_id not in ground_truth:
         return jsonify({'error': 'Invalid puzzle ID'}), 400
     
     # Get correct answer based on puzzle type
@@ -807,6 +1167,84 @@ def check_answer():
             correct_answer_info = correct_order
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid answer format for Storyboard_Logic'}), 400
+    elif puzzle_type == 'Jigsaw_Puzzle':
+        try:
+            # Check if this is a generated puzzle (stored in active_jigsaw_puzzles)
+            puzzle_state = active_jigsaw_puzzles.get(puzzle_id)
+            
+            if puzzle_state:
+                # Generated puzzle - use stored correct positions
+                correct_positions = puzzle_state.get('correct_positions', [])
+            else:
+                # Ground truth puzzle
+                if puzzle_id not in ground_truth:
+                    return jsonify({'error': 'Invalid puzzle ID'}), 400
+                correct_positions = ground_truth[puzzle_id].get('correct_positions', [])
+            
+            user_placements = user_answer if isinstance(user_answer, list) else []
+            
+            # Convert user placements to a dictionary for easy lookup
+            user_positions_dict = {}
+            for placement in user_placements:
+                if isinstance(placement, dict):
+                    piece_idx = placement.get('piece_index')
+                    grid_row = placement.get('grid_row')
+                    grid_col = placement.get('grid_col')
+                    # Ensure all values are integers
+                    try:
+                        piece_idx = int(piece_idx) if piece_idx is not None else None
+                        grid_row = int(grid_row) if grid_row is not None else None
+                        grid_col = int(grid_col) if grid_col is not None else None
+                        if piece_idx is not None and grid_row is not None and grid_col is not None:
+                            user_positions_dict[piece_idx] = {'grid_row': grid_row, 'grid_col': grid_col}
+                    except (ValueError, TypeError):
+                        continue
+            
+            # Check if all pieces are correctly placed
+            is_correct = True
+            if len(user_positions_dict) != len(correct_positions):
+                is_correct = False
+            else:
+                for correct_pos in correct_positions:
+                    piece_idx = correct_pos.get('piece_index')
+                    correct_row = correct_pos.get('grid_row')
+                    correct_col = correct_pos.get('grid_col')
+                    
+                    # Ensure correct_positions values are integers
+                    try:
+                        piece_idx = int(piece_idx) if piece_idx is not None else None
+                        correct_row = int(correct_row) if correct_row is not None else None
+                        correct_col = int(correct_col) if correct_col is not None else None
+                    except (ValueError, TypeError):
+                        is_correct = False
+                        break
+                    
+                    if piece_idx not in user_positions_dict:
+                        is_correct = False
+                        break
+                    
+                    user_pos = user_positions_dict[piece_idx]
+                    if user_pos['grid_row'] != correct_row or user_pos['grid_col'] != correct_col:
+                        is_correct = False
+                        break
+            
+            correct_answer_info = correct_positions
+            
+            # Debug logging (can be removed in production)
+            if not is_correct:
+                print(f"Jigsaw validation failed. Puzzle ID: {puzzle_id}")
+                print(f"Correct positions: {correct_positions}")
+                print(f"User placements: {user_placements}")
+                print(f"User positions dict: {user_positions_dict}")
+            
+            # Clean up generated puzzle state after validation
+            if puzzle_state:
+                active_jigsaw_puzzles.pop(puzzle_id, None)
+        except (ValueError, TypeError, KeyError) as e:
+            import traceback
+            print(f"Jigsaw validation error: {str(e)}")
+            print(traceback.format_exc())
+            return jsonify({'error': f'Invalid answer format for Jigsaw_Puzzle: {str(e)}'}), 400
     elif puzzle_type == 'Spooky_Size':
         state = active_spooky_size_puzzles.get(puzzle_id)
         if state is None:
@@ -978,6 +1416,18 @@ def check_answer():
             correct_payload = f"Correct order: {' → '.join(order_names)}"
         else:
             correct_payload = ground_truth[puzzle_id].get(answer_key)
+    elif puzzle_type == 'Jigsaw_Puzzle':
+        # Format the correct positions as a readable string
+        if isinstance(correct_answer_info, list):
+            position_strs = []
+            for pos in correct_answer_info:
+                piece_idx = pos.get('piece_index', '?')
+                row = pos.get('grid_row', '?')
+                col = pos.get('grid_col', '?')
+                position_strs.append(f"Piece {piece_idx} at ({row}, {col})")
+            correct_payload = f"Correct positions: {'; '.join(position_strs)}"
+        else:
+            correct_payload = "Puzzle completion details"
     else:
         correct_payload = ground_truth[puzzle_id].get(answer_key)
 
@@ -992,6 +1442,12 @@ def check_answer():
         response_body['details'] = correct_answer_info
     if puzzle_type == 'Spooky_Size' and isinstance(correct_answer_info, dict):
         response_body['details'] = correct_answer_info
+    if puzzle_type == 'Jigsaw_Puzzle' and not is_correct:
+        # Include debug details for incorrect jigsaw puzzles
+        response_body['details'] = {
+            'user_placements': user_answer if puzzle_type == 'Jigsaw_Puzzle' else None,
+            'correct_positions': correct_answer_info if puzzle_type == 'Jigsaw_Puzzle' else None
+        }
 
     return jsonify(response_body)
 

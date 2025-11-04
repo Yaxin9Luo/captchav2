@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let spookyGridSelectedCells = [];
     let storyboardOrder = [];
     let storyboardSelectedIndices = [];
+    let jigsawPlacements = [];
     let squiggleRevealTimeout = null;
     let colorCipherRevealTimeout = null;
     let redDotTimeout = null;
@@ -49,6 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
         squiggleSelectedIndex = null;
         storyboardOrder = [];
         storyboardSelectedIndices = [];
+        jigsawPlacements = [];
         if (squiggleRevealTimeout) {
             clearTimeout(squiggleRevealTimeout);
             squiggleRevealTimeout = null;
@@ -110,7 +112,8 @@ document.addEventListener('DOMContentLoaded', () => {
             '.color-cipher-question',
             '.red-dot-area',
             '.trajectory-gif-container',
-            '.storyboard-logic-container'
+            '.storyboard-logic-container',
+            '.jigsaw-puzzle-container'
         ];
 
         customSelectors.forEach((selector) => {
@@ -276,6 +279,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
             case 'storyboard_logic':
                 setupStoryboardLogic(data);
+                break;
+            case 'jigsaw_puzzle':
+                setupJigsawPuzzle(data);
                 break;
             case 'circle_grid_select':
             case 'circle_grid_direction_select':
@@ -688,6 +694,345 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         submitSection.appendChild(storyboardSubmitBtn);
+        container.appendChild(submitSection);
+
+        puzzleImageContainer.appendChild(container);
+        puzzleImageContainer.style.display = 'block';
+    }
+
+    function setupJigsawPuzzle(data) {
+        if (inputGroup) {
+            inputGroup.style.display = 'none';
+        }
+        submitBtn.style.display = 'none';
+
+        const pieces = data.pieces || [];
+        const gridSize = data.grid_size || [2, 2];
+        const pieceSize = data.piece_size || 150;
+        const correctPositions = data.correct_positions || [];
+        const referenceImage = data.reference_image;
+
+        if (!pieces.length) {
+            showError('No puzzle pieces available.');
+            return;
+        }
+
+        // Initialize placements - all pieces start unplaced
+        jigsawPlacements = [];
+
+        const container = document.createElement('div');
+        container.className = 'jigsaw-puzzle-container';
+        container.style.display = 'flex';
+        container.style.flexDirection = 'column';
+        container.style.alignItems = 'center';
+        container.style.gap = '20px';
+        container.style.margin = '20px auto';
+        container.style.maxWidth = '900px';
+
+        // Reference image (optional hint)
+        if (referenceImage) {
+            const referenceSection = document.createElement('div');
+            referenceSection.style.textAlign = 'center';
+            referenceSection.style.marginBottom = '10px';
+            
+            const referenceLabel = document.createElement('div');
+            referenceLabel.style.fontSize = '14px';
+            referenceLabel.style.fontWeight = '500';
+            referenceLabel.style.marginBottom = '5px';
+            referenceLabel.textContent = 'Reference image:';
+            referenceSection.appendChild(referenceLabel);
+
+            const refImg = document.createElement('img');
+            refImg.src = referenceImage;
+            refImg.alt = 'Jigsaw puzzle reference';
+            refImg.style.maxWidth = `${pieceSize * gridSize[1]}px`;
+            refImg.style.height = 'auto';
+            refImg.style.border = '2px solid #333';
+            refImg.style.borderRadius = '8px';
+            refImg.style.opacity = '0.7';
+            refImg.draggable = false;
+            referenceSection.appendChild(refImg);
+            container.appendChild(referenceSection);
+        }
+
+        // Puzzle grid area
+        const gridContainer = document.createElement('div');
+        gridContainer.style.display = 'grid';
+        gridContainer.style.gridTemplateColumns = `repeat(${gridSize[1]}, ${pieceSize}px)`;
+        gridContainer.style.gridTemplateRows = `repeat(${gridSize[0]}, ${pieceSize}px)`;
+        gridContainer.style.gap = '2px';
+        gridContainer.style.border = '3px solid #333';
+        gridContainer.style.padding = '5px';
+        gridContainer.style.backgroundColor = '#f0f0f0';
+        gridContainer.style.borderRadius = '8px';
+        gridContainer.id = 'jigsaw-grid';
+
+        // Create grid cells
+        const gridCells = [];
+        for (let row = 0; row < gridSize[0]; row++) {
+            for (let col = 0; col < gridSize[1]; col++) {
+                const cell = document.createElement('div');
+                cell.className = 'jigsaw-grid-cell';
+                cell.dataset.row = row;
+                cell.dataset.col = col;
+                cell.style.width = `${pieceSize}px`;
+                cell.style.height = `${pieceSize}px`;
+                cell.style.border = '2px dashed #ccc';
+                cell.style.borderRadius = '4px';
+                cell.style.backgroundColor = '#fff';
+                cell.style.display = 'flex';
+                cell.style.alignItems = 'center';
+                cell.style.justifyContent = 'center';
+                cell.style.position = 'relative';
+                cell.style.transition = 'background-color 0.2s';
+
+                // Drop zone
+                cell.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    if (!cell.querySelector('.jigsaw-piece')) {
+                        cell.style.backgroundColor = '#e8f4f8';
+                    }
+                });
+
+                cell.addEventListener('dragleave', () => {
+                    if (!cell.querySelector('.jigsaw-piece')) {
+                        cell.style.backgroundColor = '#fff';
+                    }
+                });
+
+                cell.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    cell.style.backgroundColor = '#fff';
+                    
+                    const pieceIndex = parseInt(e.dataTransfer.getData('text/plain'));
+                    const row = parseInt(cell.dataset.row);
+                    const col = parseInt(cell.dataset.col);
+                    
+                    // If cell already has a piece, don't replace it
+                    if (cell.querySelector('.jigsaw-piece')) {
+                        return;
+                    }
+                    
+                    // Find existing placement for this piece
+                    const existingPlacementIdx = jigsawPlacements.findIndex(p => p.piece_index === pieceIndex);
+                    
+                    // If piece was already placed in a different cell, clear that cell
+                    if (existingPlacementIdx !== -1) {
+                        const oldPlacement = jigsawPlacements[existingPlacementIdx];
+                        const oldRow = parseInt(oldPlacement.grid_row);
+                        const oldCol = parseInt(oldPlacement.grid_col);
+                        // Only clear if it's a different cell
+                        if (oldRow !== row || oldCol !== col) {
+                            const oldCell = document.querySelector(`.jigsaw-grid-cell[data-row="${oldRow}"][data-col="${oldCol}"]`);
+                            if (oldCell && oldCell !== cell) {
+                                oldCell.innerHTML = '';
+                            }
+                            // Update the placement to new position
+                            jigsawPlacements[existingPlacementIdx] = {
+                                piece_index: pieceIndex,
+                                grid_row: row,
+                                grid_col: col
+                            };
+                        } else {
+                            // Same cell, no change needed
+                            return;
+                        }
+                    } else {
+                        // New placement - add to array
+                        jigsawPlacements.push({
+                            piece_index: pieceIndex,
+                            grid_row: row,
+                            grid_col: col
+                        });
+                    }
+                    
+                    // Remove piece from tray if it was there
+                    const trayPiece = document.querySelector(`.jigsaw-tray-piece[data-piece-index="${pieceIndex}"]`);
+                    if (trayPiece) {
+                        trayPiece.remove();
+                    }
+                    
+                    // Place piece in this cell
+                    const pieceImg = document.createElement('img');
+                    pieceImg.src = pieces[pieceIndex];
+                    pieceImg.className = 'jigsaw-piece';
+                    pieceImg.style.width = '100%';
+                    pieceImg.style.height = '100%';
+                    pieceImg.style.objectFit = 'contain';
+                    pieceImg.draggable = true;
+                    pieceImg.dataset.pieceIndex = pieceIndex;
+                    
+                    // Clear cell and add piece
+                    cell.innerHTML = '';
+                    cell.appendChild(pieceImg);
+                    
+                    // Make piece draggable again
+                    pieceImg.addEventListener('dragstart', (e) => {
+                        e.dataTransfer.setData('text/plain', pieceIndex.toString());
+                        e.dataTransfer.effectAllowed = 'move';
+                    });
+                    
+                    // Allow removing piece by dragging to tray
+                    pieceImg.addEventListener('dragend', (e) => {
+                        // Check if dropped outside grid
+                        setTimeout(() => {
+                            const dropTarget = document.elementFromPoint(e.clientX, e.clientY);
+                            if (!dropTarget?.closest('.jigsaw-grid-cell')) {
+                                // Return to tray - remove from cell
+                                cell.innerHTML = '';
+                                const placementIdx = jigsawPlacements.findIndex(p => p.piece_index === pieceIndex);
+                                if (placementIdx !== -1) {
+                                    jigsawPlacements.splice(placementIdx, 1);
+                                }
+                                renderPieces();
+                            }
+                        }, 100);
+                    });
+                });
+
+                gridContainer.appendChild(cell);
+                gridCells.push(cell);
+            }
+        }
+
+        container.appendChild(gridContainer);
+
+        // Pieces tray
+        const trayContainer = document.createElement('div');
+        trayContainer.className = 'jigsaw-tray';
+        trayContainer.style.display = 'flex';
+        trayContainer.style.flexWrap = 'wrap';
+        trayContainer.style.gap = '10px';
+        trayContainer.style.justifyContent = 'center';
+        trayContainer.style.marginTop = '20px';
+        trayContainer.style.padding = '15px';
+        trayContainer.style.border = '2px dashed #ccc';
+        trayContainer.style.borderRadius = '8px';
+        trayContainer.style.backgroundColor = '#fafafa';
+        trayContainer.style.minHeight = '100px';
+
+        const trayLabel = document.createElement('div');
+        trayLabel.style.width = '100%';
+        trayLabel.style.textAlign = 'center';
+        trayLabel.style.fontSize = '14px';
+        trayLabel.style.fontWeight = '500';
+        trayLabel.style.marginBottom = '10px';
+        trayLabel.textContent = 'Drag pieces from here to the grid above';
+        trayContainer.appendChild(trayLabel);
+
+        const renderPieces = () => {
+            // Clear tray
+            const existingPieces = trayContainer.querySelectorAll('.jigsaw-tray-piece');
+            existingPieces.forEach(p => p.remove());
+
+            // Show pieces that are not placed
+            const placedPieceIndices = new Set(jigsawPlacements.map(p => p.piece_index));
+            
+            pieces.forEach((pieceSrc, index) => {
+                if (!placedPieceIndices.has(index)) {
+                    const pieceWrapper = document.createElement('div');
+                    pieceWrapper.className = 'jigsaw-tray-piece';
+                    pieceWrapper.dataset.pieceIndex = index;
+                    pieceWrapper.style.width = `${pieceSize * 0.6}px`;
+                    pieceWrapper.style.height = `${pieceSize * 0.6}px`;
+                    pieceWrapper.style.cursor = 'grab';
+                    pieceWrapper.style.border = '2px solid #333';
+                    pieceWrapper.style.borderRadius = '4px';
+                    pieceWrapper.style.overflow = 'hidden';
+                    pieceWrapper.style.transition = 'transform 0.2s';
+                    pieceWrapper.style.backgroundColor = '#fff';
+
+                    const pieceImg = document.createElement('img');
+                    pieceImg.src = pieceSrc;
+                    pieceImg.style.width = '100%';
+                    pieceImg.style.height = '100%';
+                    pieceImg.style.objectFit = 'contain';
+                    pieceImg.draggable = true;
+                    pieceImg.dataset.pieceIndex = index;
+
+                    pieceWrapper.appendChild(pieceImg);
+                    trayContainer.appendChild(pieceWrapper);
+
+                    pieceImg.addEventListener('dragstart', (e) => {
+                        e.dataTransfer.setData('text/plain', index.toString());
+                        e.dataTransfer.effectAllowed = 'move';
+                        pieceWrapper.style.opacity = '0.5';
+                    });
+
+                    pieceImg.addEventListener('dragend', () => {
+                        pieceWrapper.style.opacity = '1';
+                    });
+
+                    pieceWrapper.addEventListener('mouseenter', () => {
+                        pieceWrapper.style.transform = 'scale(1.1)';
+                    });
+
+                    pieceWrapper.addEventListener('mouseleave', () => {
+                        pieceWrapper.style.transform = 'scale(1)';
+                    });
+                }
+            });
+        };
+
+        renderPieces();
+        container.appendChild(trayContainer);
+
+        // Submit button
+        const submitSection = document.createElement('div');
+        submitSection.style.marginTop = '20px';
+
+        const jigsawSubmitBtn = document.createElement('button');
+        jigsawSubmitBtn.textContent = 'Submit Puzzle';
+        jigsawSubmitBtn.className = 'submit-jigsaw';
+        jigsawSubmitBtn.style.padding = '12px 24px';
+        jigsawSubmitBtn.style.fontSize = '16px';
+        jigsawSubmitBtn.style.fontWeight = '600';
+        jigsawSubmitBtn.style.backgroundColor = '#0078ff';
+        jigsawSubmitBtn.style.color = 'white';
+        jigsawSubmitBtn.style.border = 'none';
+        jigsawSubmitBtn.style.borderRadius = '6px';
+        jigsawSubmitBtn.style.cursor = 'pointer';
+        jigsawSubmitBtn.style.transition = 'background-color 0.2s';
+        jigsawSubmitBtn.type = 'button';
+
+        jigsawSubmitBtn.addEventListener('mouseenter', () => {
+            jigsawSubmitBtn.style.backgroundColor = '#0056b3';
+        });
+
+        jigsawSubmitBtn.addEventListener('mouseleave', () => {
+            jigsawSubmitBtn.style.backgroundColor = '#0078ff';
+        });
+
+        jigsawSubmitBtn.addEventListener('click', () => {
+            // Ensure all pieces are placed
+            const placedIndices = new Set(jigsawPlacements.map(p => p.piece_index));
+            if (jigsawPlacements.length !== pieces.length || placedIndices.size !== pieces.length) {
+                showError(`Please place all ${pieces.length} puzzle pieces before submitting. Currently placed: ${jigsawPlacements.length}`);
+                return;
+            }
+            
+            // Validate that all placements have valid coordinates
+            const invalidPlacements = jigsawPlacements.filter(p => 
+                p.piece_index === undefined || 
+                p.grid_row === undefined || 
+                p.grid_col === undefined ||
+                isNaN(p.piece_index) ||
+                isNaN(p.grid_row) ||
+                isNaN(p.grid_col)
+            );
+            
+            if (invalidPlacements.length > 0) {
+                console.error('Invalid placements detected:', invalidPlacements);
+                showError('Some puzzle pieces have invalid positions. Please try again.');
+                return;
+            }
+            
+            jigsawSubmitBtn.disabled = true;
+            jigsawSubmitBtn.textContent = 'Processing...';
+            submitAnswer();
+        });
+
+        submitSection.appendChild(jigsawSubmitBtn);
         container.appendChild(submitSection);
 
         puzzleImageContainer.appendChild(container);
@@ -1555,6 +1900,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
                 break;
+            case 'jigsaw_puzzle':
+                answerData.answer = jigsawPlacements;
+                if (!jigsawPlacements || jigsawPlacements.length === 0) {
+                    showError('Please place at least one puzzle piece before submitting.');
+                    resetCustomSubmitButtons();
+                    return;
+                }
+                // Debug logging
+                console.log('Jigsaw placements being submitted:', JSON.stringify(jigsawPlacements, null, 2));
+                break;
             default:
                 answerData.answer = userAnswerInput.value.trim();
                 break;
@@ -1580,6 +1935,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     throw new Error(data.error);
                 }
 
+                // Debug logging for jigsaw puzzles
+                if (currentPuzzle && currentPuzzle.input_type === 'jigsaw_puzzle') {
+                    console.log('Jigsaw validation response:', data);
+                    if (!data.correct && data.details) {
+                        console.log('Validation details:', data.details);
+                    }
+                }
+
                 benchmarkStats.total += 1;
                 if (data.correct) {
                     benchmarkStats.correct += 1;
@@ -1587,7 +1950,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     resultMessage.className = 'result-message correct';
                     createFireworks();
                 } else {
-                    resultMessage.textContent = 'Incorrect.';
+                    const errorMsg = data.correct_answer ? `Incorrect. ${data.correct_answer}` : 'Incorrect.';
+                    resultMessage.textContent = errorMsg;
                     resultMessage.className = 'result-message incorrect';
                     createSadFace();
                 }
@@ -1645,6 +2009,12 @@ document.addEventListener('DOMContentLoaded', () => {
             storyboardButton.disabled = false;
             storyboardButton.textContent = 'Submit Order';
         }
+
+        const jigsawButton = document.querySelector('.submit-jigsaw');
+        if (jigsawButton) {
+            jigsawButton.disabled = false;
+            jigsawButton.textContent = 'Submit Puzzle';
+        }
     }
 
     function updateStats() {
@@ -1683,6 +2053,7 @@ document.addEventListener('DOMContentLoaded', () => {
             Color_Cipher: 3,
             Red_Dot: 4,
             Storyboard_Logic: 3,
+            Jigsaw_Puzzle: 2,
         };
 
         const difficulty = difficultyRatings[puzzleType] || 1;
