@@ -57,21 +57,21 @@ def create_moving_shapes_gif(width=450, height=450, num_frames=30, grid_rows=3, 
             cell_bottom = cell_top + cell_height
 
             # Place shape in the center region of this cell
-            margin = 30
+            margin = 20  # Reduced margin for more overlap
             shape = {
                 'type': random.choice(shape_types),
                 'x': random.randint(cell_left + margin, cell_right - margin),
                 'y': random.randint(cell_top + margin, cell_bottom - margin),
                 'vx': random.uniform(-2, 2),  # Slower to stay mostly in cell
                 'vy': random.uniform(-2, 2),  # Slower to stay mostly in cell
-                'size': random.randint(15, 30),
+                'size': random.randint(30, 50),  # Larger shapes (was 15-30)
                 'color': random.choice(colors),
                 'cell_bounds': (cell_left, cell_top, cell_right, cell_bottom)  # Keep track of home cell
             }
             shapes.append(shape)
 
-    # Add a few extra roaming shapes for visual interest
-    num_extra = random.randint(2, 4)
+    # Add more extra roaming shapes for visual complexity
+    num_extra = random.randint(6, 10)  # Increased from 2-4 to 6-10
     for i in range(num_extra):
         shape = {
             'type': random.choice(shape_types),
@@ -79,7 +79,7 @@ def create_moving_shapes_gif(width=450, height=450, num_frames=30, grid_rows=3, 
             'y': random.randint(40, height - 40),
             'vx': random.uniform(-3, 3),
             'vy': random.uniform(-3, 3),
-            'size': random.randint(20, 35),
+            'size': random.randint(35, 55),  # Larger roaming shapes (was 20-35)
             'color': random.choice(colors),
             'cell_bounds': None  # These can roam freely
         }
@@ -120,7 +120,7 @@ def create_moving_shapes_gif(width=450, height=450, num_frames=30, grid_rows=3, 
                     shape['x'] + shape['size'],
                     shape['y'] + shape['size']
                 ]
-                draw.ellipse(bbox, fill=shape['color'], outline=(0, 0, 0), width=2)
+                draw.ellipse(bbox, fill=shape['color'])
             elif shape['type'] == 'square':
                 bbox = [
                     shape['x'] - shape['size'],
@@ -128,14 +128,14 @@ def create_moving_shapes_gif(width=450, height=450, num_frames=30, grid_rows=3, 
                     shape['x'] + shape['size'],
                     shape['y'] + shape['size']
                 ]
-                draw.rectangle(bbox, fill=shape['color'], outline=(0, 0, 0), width=2)
+                draw.rectangle(bbox, fill=shape['color'])
             elif shape['type'] == 'triangle':
                 points = [
                     (shape['x'], shape['y'] - shape['size']),
                     (shape['x'] - shape['size'], shape['y'] + shape['size']),
                     (shape['x'] + shape['size'], shape['y'] + shape['size'])
                 ]
-                draw.polygon(points, fill=shape['color'], outline=(0, 0, 0))
+                draw.polygon(points, fill=shape['color'])
             elif shape['type'] == 'pentagon':
                 # Regular pentagon
                 points = []
@@ -145,7 +145,7 @@ def create_moving_shapes_gif(width=450, height=450, num_frames=30, grid_rows=3, 
                     px = shape['x'] + shape['size'] * math.cos(angle)
                     py = shape['y'] + shape['size'] * math.sin(angle)
                     points.append((px, py))
-                draw.polygon(points, fill=shape['color'], outline=(0, 0, 0))
+                draw.polygon(points, fill=shape['color'])
             elif shape['type'] == 'star':
                 # 5-pointed star
                 points = []
@@ -156,7 +156,7 @@ def create_moving_shapes_gif(width=450, height=450, num_frames=30, grid_rows=3, 
                     px = shape['x'] + radius * math.cos(angle)
                     py = shape['y'] + radius * math.sin(angle)
                     points.append((px, py))
-                draw.polygon(points, fill=shape['color'], outline=(0, 0, 0))
+                draw.polygon(points, fill=shape['color'])
 
         frames.append(img)
 
