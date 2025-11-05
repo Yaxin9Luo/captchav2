@@ -39,6 +39,7 @@ PUZZLE_TYPE_SEQUENCE = [
     'Storyboard_Logic',
     'Jigsaw_Puzzle',
     'Transform_Pipeline',
+    'Set_Game',
 ]
 sequential_index = 0
 
@@ -1746,6 +1747,8 @@ def get_puzzle():
         input_type = "jigsaw_puzzle"
     elif puzzle_type == "Transform_Pipeline":
         input_type = "transform_pipeline_select"
+    elif puzzle_type == "Set_Game":
+        input_type = "set_game_select"
     
     # For Rotation_Match, include additional data needed for the interface
     additional_data = {}
@@ -1962,11 +1965,22 @@ def get_puzzle():
             "correct_positions": correct_positions,
             "reference_image": f'/captcha_data/{puzzle_type}/{reference_image}' if reference_image else None
         }
+    elif puzzle_type == "Set_Game":
+        option_images = ground_truth[selected_puzzle].get("options", [])
+        if not option_images:
+            return jsonify({'error': f'Invalid Set_Game data: {selected_puzzle}'}), 500
+
+        additional_data = {
+            "option_images": [f'/captcha_data/{puzzle_type}/{img}' for img in option_images],
+            "grid_size": ground_truth[selected_puzzle].get("grid_size", [4, 4]),
+            "answer": ground_truth[selected_puzzle].get("answer", []),
+            "num_sets": ground_truth[selected_puzzle].get("num_sets", 0)
+        }
     else:
         prompt = ground_truth[selected_puzzle].get("prompt", "Solve the CAPTCHA puzzle")
 
     image_path = None
-    if puzzle_type not in ("Rotation_Match", "Shadow_Plausible", "Mirror",  "Squiggle", "Spooky_Circle_Grid", "Spooky_Circle_Grid_Direction", "Spooky_Shape_Grid", "Color_Cipher", "Color_Counting", "Trajectory_Recovery", "Storyboard_Logic", "Jigsaw_Puzzle", "Transform_Pipeline"):
+    if puzzle_type not in ("Rotation_Match", "Shadow_Plausible", "Mirror",  "Squiggle", "Spooky_Circle_Grid", "Spooky_Circle_Grid_Direction", "Spooky_Shape_Grid", "Color_Cipher", "Color_Counting", "Trajectory_Recovery", "Storyboard_Logic", "Jigsaw_Puzzle", "Transform_Pipeline", "Set_Game"):
         image_path = f'/captcha_data/{puzzle_type}/{selected_puzzle}'
         if not media_type:
             media_type = "image"
@@ -2168,6 +2182,15 @@ def check_answer():
             correct_answer_info = correct_indices
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid answer format for Trajectory_Recovery'}), 400
+    elif puzzle_type == 'Set_Game':
+        try:
+            # For Set_Game, answer is a flat list of 3 card indices [7, 9, 11]
+            correct_indices = sorted(ground_truth[puzzle_id].get('answer', []))
+            user_indices = sorted(int(idx) for idx in user_answer)
+            is_correct = user_indices == correct_indices
+            correct_answer_info = correct_indices
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid answer format for Set_Game'}), 400
     elif puzzle_type == 'Storyboard_Logic':
         try:
             # For Storyboard_Logic, order matters - check exact sequence match

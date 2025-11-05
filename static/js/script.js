@@ -295,6 +295,7 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'shape_grid_select':
             case 'color_counting_select':
             case 'trajectory_recovery_select':
+            case 'set_game_select':
                 setupSpookyGridSelect(data);
                 break;
             default:
@@ -2035,6 +2036,7 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'shape_grid_select':
             case 'color_counting_select':
             case 'trajectory_recovery_select':
+            case 'set_game_select':
                 answerData.answer = spookyGridSelectedCells;
                 if (!spookyGridSelectedCells.length) {
                     showError('Select at least one cell before submitting.');
