@@ -57,14 +57,14 @@ def create_moving_shapes_gif(width=450, height=450, num_frames=30, grid_rows=3, 
             cell_bottom = cell_top + cell_height
 
             # Place shape in the center region of this cell
-            margin = 20  # Reduced margin for more overlap
+            margin = 15  # Reduced margin for more overlap
             shape = {
                 'type': random.choice(shape_types),
                 'x': random.randint(cell_left + margin, cell_right - margin),
                 'y': random.randint(cell_top + margin, cell_bottom - margin),
                 'vx': random.uniform(-2, 2),  # Slower to stay mostly in cell
                 'vy': random.uniform(-2, 2),  # Slower to stay mostly in cell
-                'size': random.randint(30, 50),  # Larger shapes (was 15-30)
+                'size': random.randint(40, 60),  # Even larger shapes (was 30-50)
                 'color': random.choice(colors),
                 'cell_bounds': (cell_left, cell_top, cell_right, cell_bottom)  # Keep track of home cell
             }
@@ -79,7 +79,7 @@ def create_moving_shapes_gif(width=450, height=450, num_frames=30, grid_rows=3, 
             'y': random.randint(40, height - 40),
             'vx': random.uniform(-3, 3),
             'vy': random.uniform(-3, 3),
-            'size': random.randint(35, 55),  # Larger roaming shapes (was 20-35)
+            'size': random.randint(45, 70),  # Even larger roaming shapes (was 35-55)
             'color': random.choice(colors),
             'cell_bounds': None  # These can roam freely
         }
@@ -260,7 +260,7 @@ def generate_dynamic_jigsaw_dataset(output_dir, num_puzzles=10, grid_rows=3, gri
 
         print(f"  Saved {len(piece_filenames)} animated piece GIFs")
 
-        # Generate correct positions
+        # Generate correct positions mapping
         correct_positions = []
         for row in range(grid_rows):
             for col in range(grid_cols):
@@ -271,6 +271,24 @@ def generate_dynamic_jigsaw_dataset(output_dir, num_puzzles=10, grid_rows=3, gri
                     "grid_col": col
                 })
 
+        # Shuffle the piece order for presentation (harder for LLMs)
+        shuffled_indices = list(range(grid_rows * grid_cols))
+        random.shuffle(shuffled_indices)
+        shuffled_piece_filenames = [piece_filenames[i] for i in shuffled_indices]
+
+        # Update correct_positions to reflect the shuffled presentation order
+        # The frontend will receive pieces in shuffled_piece_filenames order
+        # but needs to know their correct grid positions
+        shuffled_correct_positions = []
+        for display_idx, original_piece_id in enumerate(shuffled_indices):
+            # Find the correct position for this piece
+            correct_pos = correct_positions[original_piece_id]
+            shuffled_correct_positions.append({
+                "piece_index": display_idx,  # Index in the shuffled array
+                "grid_row": correct_pos["grid_row"],  # Where it should go
+                "grid_col": correct_pos["grid_col"]
+            })
+
         # Create ground truth entry
         puzzle_id = f"dynamic_jigsaw_{puzzle_idx}"
         ground_truth[puzzle_id] = {
@@ -278,8 +296,8 @@ def generate_dynamic_jigsaw_dataset(output_dir, num_puzzles=10, grid_rows=3, gri
             "description": f"Complete a {grid_rows}x{grid_cols} animated jigsaw puzzle with moving shapes",
             "grid_size": [grid_rows, grid_cols],
             "image": reference_filename,
-            "pieces": piece_filenames,
-            "correct_positions": correct_positions,
+            "pieces": shuffled_piece_filenames,  # Pieces in shuffled order
+            "correct_positions": shuffled_correct_positions,  # Correct positions for shuffled pieces
             "piece_size": 450 // grid_cols,  # 150 for 3x3 grid
             "difficulty": 3 + grid_rows + grid_cols,
             "media_type": "animated_gif"
