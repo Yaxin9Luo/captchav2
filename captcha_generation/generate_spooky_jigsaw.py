@@ -1,0 +1,390 @@
+"""
+Spooky Jigsaw CAPTCHA Generator
+
+Generates animated GIF jigsaw puzzles where pieces are only visible through OPPOSITE MOTION.
+Individual frames look like uniform noise with no spatial features.
+
+This combines jigsaw puzzle mechanics with motion-based visibility:
+- Background noise: Scrolls in one direction (e.g., upward)
+- Jigsaw piece noise: Scrolls in OPPOSITE direction (e.g., downward)
+- Per-frame: Both look identical (same noise statistics)
+- Over time: Humans detect opposite motion → pieces and reference emerge
+- Must solve the jigsaw puzzle by matching motion patterns!
+"""
+
+import numpy as np
+from PIL import Image, ImageDraw
+import json
+import os
+from pathlib import Path
+from scipy import ndimage
+
+
+def scroll_noise(noise_field, offset, direction='vertical'):
+    """
+    Scroll a noise field by a given offset.
+
+    Args:
+        noise_field: 2D numpy array
+        offset: Number of pixels to scroll
+        direction: 'vertical' (up/down) or 'horizontal' (left/right)
+
+    Returns:
+        Scrolled noise field
+    """
+    if direction == 'vertical':
+        return np.roll(noise_field, offset, axis=0)
+    else:  # horizontal
+        return np.roll(noise_field, offset, axis=1)
+
+
+def generate_mid_frequency_noise(height, width, sigma=3.0):
+    """
+    Generate mid-spatial frequency noise (not white noise).
+    Uses Gaussian filtering to concentrate energy in mid frequencies.
+
+    Args:
+        height, width: Image dimensions
+        sigma: Gaussian blur sigma (controls spatial frequency)
+
+    Returns:
+        Grayscale noise array with values 0-1
+    """
+    # Start with white noise
+    noise = np.random.randn(height, width)
+    # Apply Gaussian filter to get mid-frequency noise
+    filtered_noise = ndimage.gaussian_filter(noise, sigma=sigma)
+    # Normalize to 0-1 range
+    filtered_noise = (filtered_noise - filtered_noise.min()) / (filtered_noise.max() - filtered_noise.min())
+    return filtered_noise
+
+
+def create_shape_pattern(width, height, seed):
+    """
+    Create a pattern of shapes to serve as the jigsaw content.
+    This pattern will be revealed through motion.
+
+    Args:
+        width, height: Dimensions
+        seed: Random seed for reproducibility
+
+    Returns:
+        Binary mask (1 = shape content, 0 = background)
+    """
+    np.random.seed(seed)
+    mask = np.zeros((height, width), dtype=float)
+
+    # Add 6-9 shapes
+    num_shapes = np.random.randint(6, 10)
+    shape_types = ['circle', 'square', 'triangle', 'pentagon', 'star']
+
+    for _ in range(num_shapes):
+        shape_type = np.random.choice(shape_types)
+        cx = np.random.randint(30, width - 30)
+        cy = np.random.randint(30, height - 30)
+        size = np.random.randint(20, 40)
+
+        # Create shape mask
+        if shape_type == 'circle':
+            y_coords, x_coords = np.ogrid[:height, :width]
+            distance = np.sqrt((x_coords - cx)**2 + (y_coords - cy)**2)
+            shape_mask = (distance <= size).astype(float)
+        elif shape_type == 'square':
+            y_coords, x_coords = np.ogrid[:height, :width]
+            shape_mask = ((np.abs(x_coords - cx) <= size) & (np.abs(y_coords - cy) <= size)).astype(float)
+        elif shape_type == 'triangle':
+            img = Image.new('L', (width, height), 0)
+            draw = ImageDraw.Draw(img)
+            points = [
+                (cx, cy - size),
+                (cx - size, cy + size),
+                (cx + size, cy + size)
+            ]
+            draw.polygon(points, fill=255)
+            shape_mask = np.array(img).astype(float) / 255.0
+        elif shape_type == 'pentagon':
+            img = Image.new('L', (width, height), 0)
+            draw = ImageDraw.Draw(img)
+            import math
+            points = []
+            for i in range(5):
+                angle = math.pi * 2 * i / 5 - math.pi / 2
+                px = cx + size * math.cos(angle)
+                py = cy + size * math.sin(angle)
+                points.append((px, py))
+            draw.polygon(points, fill=255)
+            shape_mask = np.array(img).astype(float) / 255.0
+        elif shape_type == 'star':
+            img = Image.new('L', (width, height), 0)
+            draw = ImageDraw.Draw(img)
+            import math
+            points = []
+            for i in range(10):
+                angle = math.pi * 2 * i / 10 - math.pi / 2
+                radius = size if i % 2 == 0 else size * 0.4
+                px = cx + radius * math.cos(angle)
+                py = cy + radius * math.sin(angle)
+                points.append((px, py))
+            draw.polygon(points, fill=255)
+            shape_mask = np.array(img).astype(float) / 255.0
+
+        # Add to main mask
+        mask = np.maximum(mask, shape_mask)
+
+    # Smooth the mask edges
+    mask = ndimage.gaussian_filter(mask, sigma=2.0)
+    mask = np.clip(mask, 0, 1)
+
+    return mask
+
+
+def generate_spooky_jigsaw_gif(content_mask, output_path, width=450, height=450, num_frames=30, fps=15):
+    """
+    Generate a GIF where jigsaw content is revealed through OPPOSITE MOTION.
+
+    Motion-Based Strategy:
+    - Background noise scrolls in one direction (e.g., upward)
+    - Content regions scroll in OPPOSITE direction (e.g., downward)
+    - Each frame: uniform noise with same statistics everywhere
+    - Over time: opposite motion reveals the jigsaw pattern
+
+    Args:
+        content_mask: Binary mask where 1 = content, 0 = background
+        output_path: Where to save the GIF
+        width, height: Dimensions of the image
+        num_frames: Number of frames in animation
+        fps: Frames per second
+    """
+    # Motion parameters
+    scroll_speed = 2  # Pixels per frame to scroll
+    direction = 'vertical'  # Can be 'vertical' or 'horizontal'
+
+    # Visual parameters
+    base_luminance = 128.0
+    noise_amplitude = 40.0  # Larger for better visibility
+
+    # Generate TWO large noise fields for scrolling
+    # Make them larger than the image to avoid edge artifacts
+    pad = scroll_speed * num_frames
+    large_height = height + 2 * pad
+    large_width = width + 2 * pad
+
+    # Background noise field (scrolls one direction)
+    bg_noise_field = generate_mid_frequency_noise(large_height, large_width, sigma=3.0)
+    bg_noise_field = (bg_noise_field - 0.5) * 2.0  # Normalize to ~unit variance
+
+    # Content noise field (scrolls OPPOSITE direction)
+    content_noise_field = generate_mid_frequency_noise(large_height, large_width, sigma=3.0)
+    content_noise_field = (content_noise_field - 0.5) * 2.0  # Normalize to ~unit variance
+
+    # Generate frames with opposite motion
+    frames = []
+    for frame_idx in range(num_frames):
+        # Calculate scroll offsets
+        # Background scrolls UP (negative offset in vertical direction)
+        bg_offset = -frame_idx * scroll_speed
+        # Content scrolls DOWN (positive offset in vertical direction)
+        content_offset = frame_idx * scroll_speed
+
+        # Extract current frame from scrolling background noise
+        bg_scrolled = scroll_noise(bg_noise_field, bg_offset, direction)
+        bg_frame = bg_scrolled[pad:pad+height, pad:pad+width]
+
+        # Extract current frame from scrolling content noise
+        content_scrolled = scroll_noise(content_noise_field, content_offset, direction)
+        content_frame = content_scrolled[pad:pad+height, pad:pad+width]
+
+        # Start with background noise
+        img_array = base_luminance + noise_amplitude * bg_frame
+
+        # Composite content using mask
+        # Content regions show the opposite-scrolling noise
+        content_signal = base_luminance + noise_amplitude * content_frame
+        img_array = img_array * (1 - content_mask) + content_signal * content_mask
+
+        # Clip to valid range
+        img_array = np.clip(img_array, 0, 255).astype(np.uint8)
+
+        # Convert grayscale to RGB
+        img_rgb = np.stack([img_array, img_array, img_array], axis=-1)
+
+        # Convert to PIL Image
+        frame = Image.fromarray(img_rgb)
+        frames.append(frame)
+
+    # Save as GIF
+    frames[0].save(
+        output_path,
+        save_all=True,
+        append_images=frames[1:],
+        duration=int(1000/fps),
+        loop=0
+    )
+
+
+def split_mask_into_pieces(mask, grid_rows, grid_cols):
+    """
+    Split a mask into jigsaw pieces.
+
+    Args:
+        mask: 2D numpy array
+        grid_rows: Number of rows in jigsaw grid
+        grid_cols: Number of columns in jigsaw grid
+
+    Returns:
+        dict: piece_id -> mask for that piece
+    """
+    height, width = mask.shape
+    piece_height = height // grid_rows
+    piece_width = width // grid_cols
+
+    piece_masks = {}
+
+    for row in range(grid_rows):
+        for col in range(grid_cols):
+            piece_id = row * grid_cols + col
+
+            # Extract this piece region
+            top = row * piece_height
+            left = col * piece_width
+            bottom = top + piece_height
+            right = left + piece_width
+
+            # Create piece mask (extract from full mask)
+            piece_mask = np.zeros_like(mask)
+            piece_mask[top:bottom, left:right] = mask[top:bottom, left:right]
+
+            piece_masks[piece_id] = piece_mask
+
+    return piece_masks
+
+
+def generate_spooky_jigsaw_dataset(output_dir, num_puzzles=10, grid_rows=3, grid_cols=3):
+    """
+    Generate Spooky Jigsaw CAPTCHA dataset with motion-based visibility.
+
+    Args:
+        output_dir: Directory to save the dataset
+        num_puzzles: Number of puzzles to generate
+        grid_rows: Number of rows in jigsaw grid (default 3 for 3x3)
+        grid_cols: Number of columns in jigsaw grid (default 3 for 3x3)
+    """
+    os.makedirs(output_dir, exist_ok=True)
+
+    ground_truth = {}
+
+    print(f"Generating {num_puzzles} Spooky Jigsaw puzzles...")
+
+    for puzzle_idx in range(num_puzzles):
+        print(f"Puzzle {puzzle_idx}: Generating spooky animated jigsaw...")
+
+        # Create content pattern (shapes to be revealed by motion)
+        content_mask = create_shape_pattern(
+            width=450,
+            height=450,
+            seed=puzzle_idx * 12345
+        )
+
+        # Generate reference GIF with full pattern
+        reference_filename = f"spooky_jigsaw_{puzzle_idx}.gif"
+        reference_path = os.path.join(output_dir, reference_filename)
+        generate_spooky_jigsaw_gif(
+            content_mask=content_mask,
+            output_path=reference_path,
+            width=450,
+            height=450,
+            num_frames=30,
+            fps=15
+        )
+        print(f"  Saved reference GIF: {reference_filename}")
+
+        # Split mask into pieces
+        piece_masks = split_mask_into_pieces(content_mask, grid_rows, grid_cols)
+
+        # Generate each piece as animated GIF
+        piece_filenames = []
+        for piece_id in range(grid_rows * grid_cols):
+            piece_filename = f"spooky_jigsaw_{puzzle_idx}_piece{piece_id}.gif"
+            piece_path = os.path.join(output_dir, piece_filename)
+
+            generate_spooky_jigsaw_gif(
+                content_mask=piece_masks[piece_id],
+                output_path=piece_path,
+                width=450,
+                height=450,
+                num_frames=30,
+                fps=15
+            )
+            piece_filenames.append(piece_filename)
+
+        print(f"  Saved {len(piece_filenames)} spooky animated piece GIFs")
+
+        # Generate correct positions
+        correct_positions = []
+        for row in range(grid_rows):
+            for col in range(grid_cols):
+                piece_index = row * grid_cols + col
+                correct_positions.append({
+                    "piece_index": piece_index,
+                    "grid_row": row,
+                    "grid_col": col
+                })
+
+        # Create ground truth entry
+        puzzle_id = f"spooky_jigsaw_{puzzle_idx}"
+        ground_truth[puzzle_id] = {
+            "prompt": "Watch carefully! The puzzle pieces will appear through motion. Drag them to complete the jigsaw puzzle.",
+            "description": f"Complete a {grid_rows}x{grid_cols} motion-based jigsaw puzzle with opposite scrolling noise",
+            "grid_size": [grid_rows, grid_cols],
+            "image": reference_filename,
+            "pieces": piece_filenames,
+            "correct_positions": correct_positions,
+            "piece_size": 450 // grid_cols,  # 150 for 3x3 grid
+            "difficulty": 5,
+            "media_type": "spooky_gif"
+        }
+
+    # Save ground truth
+    ground_truth_path = os.path.join(output_dir, 'ground_truth.json')
+    with open(ground_truth_path, 'w') as f:
+        json.dump(ground_truth, f, indent=2)
+
+    print(f"\n✓ Generated {num_puzzles} Spooky Jigsaw puzzles")
+    print(f"✓ Saved to {output_dir}")
+    print(f"✓ Ground truth saved to {ground_truth_path}")
+
+
+if __name__ == "__main__":
+    output_dir = "../captcha_data/Spooky_Jigsaw"
+    generate_spooky_jigsaw_dataset(output_dir, num_puzzles=10, grid_rows=3, grid_cols=3)
+
+    print("\n" + "="*70)
+    print("🎯 Spooky Jigsaw CAPTCHA Dataset Generated!")
+    print("Motion-Based Jigsaw Puzzle - Opposite Scrolling Noise")
+    print("="*70)
+    print("\n🔬 Technical Implementation:")
+    print("  ✓ Background: Mid-frequency noise scrolling UPWARD")
+    print("  ✓ Jigsaw content: Mid-frequency noise scrolling DOWNWARD")
+    print("  ✓ Scroll speed: 2 pixels/frame")
+    print("  ✓ Soft-edged shape masks for natural blending")
+    print("  ✓ Same noise statistics everywhere (mean ~128, amplitude ~40)")
+    print("\n📊 Per-Frame Analysis:")
+    print("  • Single frame: Uniform noise texture everywhere")
+    print("  • No spatial features, edges, or intensity differences")
+    print("  • Both regions have identical noise statistics")
+    print("  • Impossible to detect jigsaw pieces from single frame!")
+    print("\n🧠 Why Humans Can See It:")
+    print("  • Human visual system has excellent motion detection")
+    print("  • Background noise scrolls UP → creates upward motion percept")
+    print("  • Content noise scrolls DOWN → creates downward motion percept")
+    print("  • After ~1-2 seconds: shapes 'pop out' as opposite-moving regions")
+    print("  • Motion contrast reveals jigsaw piece boundaries and content")
+    print("\n🤖 Why LLMs/Vision Models Fail:")
+    print("  ✗ Single frame: Just uniform noise (no spatial cues)")
+    print("  ✗ Temporal mean: FLAT (scrolling doesn't change mean)")
+    print("  ✗ Temporal std: FLAT (scrolling doesn't change variance)")
+    print("  ✗ Frame differencing: Shows motion but not piece shapes")
+    print("  ✗ Most vision models: No motion processing in their architecture")
+    print("\n🏆 This is a TRUE motion-based temporal jigsaw CAPTCHA!")
+    print("    Humans: Instant motion perception → Pieces visible in 1-2 sec")
+    print("    LLMs: No motion processing → See only noise")

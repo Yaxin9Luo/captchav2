@@ -40,7 +40,8 @@ PUZZLE_TYPE_SEQUENCE = [
     # 'Jigsaw_Puzzle',
     # 'Transform_Pipeline',
     # 'Set_Game',
-    'Dynamic_Jigsaw',
+    # 'Dynamic_Jigsaw',
+    'Spooky_Jigsaw',
 ]
 sequential_index = 0
 
@@ -1752,6 +1753,8 @@ def get_puzzle():
         input_type = "set_game_select"
     elif puzzle_type == "Dynamic_Jigsaw":
         input_type = "jigsaw_puzzle"
+    elif puzzle_type == "Spooky_Jigsaw":
+        input_type = "jigsaw_puzzle"
 
     # For Rotation_Match, include additional data needed for the interface
     additional_data = {}
@@ -1997,11 +2000,29 @@ def get_puzzle():
             "correct_positions": correct_positions,
             "reference_image": f'/captcha_data/{puzzle_type}/{reference_image}' if reference_image else None
         }
+    elif puzzle_type == "Spooky_Jigsaw":
+        # Spooky Jigsaw with motion-based visibility
+        pieces = ground_truth[selected_puzzle].get("pieces", [])
+        grid_size = ground_truth[selected_puzzle].get("grid_size", [3, 3])
+        piece_size = ground_truth[selected_puzzle].get("piece_size", 150)
+        correct_positions = ground_truth[selected_puzzle].get("correct_positions", [])
+        reference_image = ground_truth[selected_puzzle].get("image")
+
+        if not pieces or not correct_positions:
+            return jsonify({'error': f'Invalid Spooky_Jigsaw data: {selected_puzzle}'}), 500
+
+        additional_data = {
+            "pieces": [f'/captcha_data/{puzzle_type}/{piece}' for piece in pieces],
+            "grid_size": grid_size,
+            "piece_size": piece_size,
+            "correct_positions": correct_positions,
+            "reference_image": f'/captcha_data/{puzzle_type}/{reference_image}' if reference_image else None
+        }
     else:
         prompt = ground_truth[selected_puzzle].get("prompt", "Solve the CAPTCHA puzzle")
 
     image_path = None
-    if puzzle_type not in ("Rotation_Match", "Shadow_Plausible", "Mirror",  "Squiggle", "Spooky_Circle_Grid", "Spooky_Circle_Grid_Direction", "Spooky_Shape_Grid", "Color_Cipher", "Color_Counting", "Trajectory_Recovery", "Storyboard_Logic", "Jigsaw_Puzzle", "Transform_Pipeline", "Set_Game", "Dynamic_Jigsaw"):
+    if puzzle_type not in ("Rotation_Match", "Shadow_Plausible", "Mirror",  "Squiggle", "Spooky_Circle_Grid", "Spooky_Circle_Grid_Direction", "Spooky_Shape_Grid", "Color_Cipher", "Color_Counting", "Trajectory_Recovery", "Storyboard_Logic", "Jigsaw_Puzzle", "Transform_Pipeline", "Set_Game", "Dynamic_Jigsaw", "Spooky_Jigsaw"):
         image_path = f'/captcha_data/{puzzle_type}/{selected_puzzle}'
         if not media_type:
             media_type = "image"
@@ -2221,7 +2242,7 @@ def check_answer():
             correct_answer_info = correct_order
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid answer format for Storyboard_Logic'}), 400
-    elif puzzle_type == 'Jigsaw_Puzzle' or puzzle_type == 'Dynamic_Jigsaw':
+    elif puzzle_type == 'Jigsaw_Puzzle' or puzzle_type == 'Dynamic_Jigsaw' or puzzle_type == 'Spooky_Jigsaw':
         try:
             # Check if this is a generated puzzle (stored in active_jigsaw_puzzles)
             puzzle_state = active_jigsaw_puzzles.get(puzzle_id)
@@ -2505,7 +2526,7 @@ def check_answer():
                 correct_payload = ground_truth[puzzle_id].get(answer_key)
             else:
                 correct_payload = str(correct_answer_info) if correct_answer_info is not None else "Unknown"
-    elif puzzle_type == 'Jigsaw_Puzzle' or puzzle_type == 'Dynamic_Jigsaw':
+    elif puzzle_type == 'Jigsaw_Puzzle' or puzzle_type == 'Dynamic_Jigsaw' or puzzle_type == 'Spooky_Jigsaw':
         # Format the correct positions as a readable string
         if isinstance(correct_answer_info, list):
             position_strs = []
