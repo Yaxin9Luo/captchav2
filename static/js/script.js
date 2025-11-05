@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let shadowSelectedCells = [];
     let mirrorSelectedCells = [];
     let squiggleSelectedIndex = null;
+    let transformPipelineSelectedIndex = null;
     let spookyGridSelectedCells = [];
     let storyboardOrder = [];
     let storyboardSelectedIndices = [];
@@ -48,6 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
         shadowSelectedCells = [];
         mirrorSelectedCells = [];
         squiggleSelectedIndex = null;
+        transformPipelineSelectedIndex = null;
         storyboardOrder = [];
         storyboardSelectedIndices = [];
         jigsawPlacements = [];
@@ -108,6 +110,8 @@ document.addEventListener('DOMContentLoaded', () => {
             '.squiggle-preview',
             '.squiggle-options-grid',
             '.squiggle-submit',
+            '.transform-pipeline-container',
+            '.transform-pipeline-submit',
             '.color-cipher-preview',
             '.color-cipher-question',
             '.red-dot-area',
@@ -282,6 +286,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
             case 'jigsaw_puzzle':
                 setupJigsawPuzzle(data);
+                break;
+            case 'transform_pipeline_select':
+                setupTransformPipelineSelect(data);
                 break;
             case 'circle_grid_select':
             case 'circle_grid_direction_select':
@@ -1693,6 +1700,147 @@ document.addEventListener('DOMContentLoaded', () => {
         optionElement.classList.add('active');
     }
 
+    function setupTransformPipelineSelect(data) {
+        if (inputGroup) {
+            inputGroup.style.display = 'none';
+        }
+        submitBtn.style.display = 'none';
+
+        transformPipelineSelectedIndex = null;
+
+        const optionImages = data.option_images || [];
+        if (!optionImages.length) {
+            showError('No transform pipeline options available.');
+            return;
+        }
+
+        const container = document.createElement('div');
+        container.className = 'transform-pipeline-container';
+
+        // Reference image section
+        const referenceSection = document.createElement('div');
+        referenceSection.className = 'transform-pipeline-reference';
+
+        const referenceLabel = document.createElement('div');
+        referenceLabel.className = 'transform-pipeline-label';
+        referenceLabel.textContent = 'Starting Image:';
+        referenceSection.appendChild(referenceLabel);
+
+        const referenceImage = document.createElement('img');
+        referenceImage.src = data.reference_image;
+        referenceImage.alt = 'Reference image';
+        referenceImage.draggable = false;
+        referenceImage.className = 'transform-pipeline-ref-image';
+        referenceSection.appendChild(referenceImage);
+
+        // Transform steps section
+        const stepsSection = document.createElement('div');
+        stepsSection.className = 'transform-pipeline-steps';
+
+        const stepsLabel = document.createElement('div');
+        stepsLabel.className = 'transform-pipeline-label';
+        stepsLabel.textContent = 'Transform Steps:';
+        stepsSection.appendChild(stepsLabel);
+
+        const stepsList = document.createElement('div');
+        stepsList.className = 'transform-pipeline-steps-list';
+        (data.transform_steps || []).forEach((step, idx) => {
+            const stepItem = document.createElement('div');
+            stepItem.className = 'transform-pipeline-step';
+            stepItem.textContent = `${idx + 1}. ${step}`;
+            stepsList.appendChild(stepItem);
+        });
+        stepsSection.appendChild(stepsList);
+
+        container.appendChild(referenceSection);
+        container.appendChild(stepsSection);
+
+        // Options grid
+        const optionsGrid = document.createElement('div');
+        optionsGrid.className = 'transform-pipeline-options-grid';
+
+        const optionsLabel = document.createElement('div');
+        optionsLabel.className = 'transform-pipeline-label';
+        optionsLabel.textContent = 'Select the correct result:';
+        optionsLabel.style.marginTop = '20px';
+        container.appendChild(optionsLabel);
+
+        puzzleImageContainer.style.display = 'block';
+
+        const gridSize = Array.isArray(data.grid_size) ? data.grid_size : null;
+        if (gridSize && gridSize.length > 1 && Number.isFinite(gridSize[1]) && gridSize[1] > 0) {
+            optionsGrid.style.gridTemplateColumns = `repeat(${gridSize[1]}, minmax(160px, 1fr))`;
+        } else if (optionImages.length === 4) {
+            optionsGrid.style.gridTemplateColumns = 'repeat(2, minmax(160px, 1fr))';
+        } else if (optionImages.length === 6) {
+            optionsGrid.style.gridTemplateColumns = 'repeat(3, minmax(160px, 1fr))';
+        }
+        optionsGrid.style.columnGap = '40px';
+        optionsGrid.style.rowGap = '32px';
+        optionsGrid.style.justifyContent = 'center';
+        optionsGrid.style.marginTop = '20px';
+
+        optionImages.forEach((src, index) => {
+            const option = document.createElement('div');
+            option.className = 'transform-pipeline-option';
+            option.dataset.index = index;
+
+            const img = document.createElement('img');
+            img.src = src;
+            img.alt = `Option ${index + 1}`;
+            img.draggable = false;
+            option.appendChild(img);
+
+            option.addEventListener('click', () => selectTransformPipelineOption(index, option));
+
+            optionsGrid.appendChild(option);
+        });
+
+        container.appendChild(optionsGrid);
+
+        // Submit button
+        const submitSection = document.createElement('div');
+        submitSection.className = 'transform-pipeline-submit';
+        submitSection.style.display = 'flex';
+        submitSection.style.justifyContent = 'center';
+        submitSection.style.marginTop = '20px';
+
+        const transformSubmitBtn = document.createElement('button');
+        transformSubmitBtn.className = 'submit-transform-pipeline';
+        transformSubmitBtn.type = 'button';
+        transformSubmitBtn.textContent = 'Submit';
+        transformSubmitBtn.addEventListener('click', () => {
+            if (transformPipelineSelectedIndex === null) {
+                showError('Select the correct transformed image.');
+                return;
+            }
+            transformSubmitBtn.disabled = true;
+            transformSubmitBtn.textContent = 'Processing...';
+            submitAnswer();
+        });
+
+        submitSection.appendChild(transformSubmitBtn);
+        container.appendChild(submitSection);
+
+        puzzleImageContainer.appendChild(container);
+    }
+
+    function selectTransformPipelineOption(index, optionElement) {
+        if (transformPipelineSelectedIndex === index) {
+            transformPipelineSelectedIndex = null;
+            optionElement.classList.remove('active');
+            return;
+        }
+
+        const previouslyActive = document.querySelector('.transform-pipeline-option.active');
+        if (previouslyActive) {
+            previouslyActive.classList.remove('active');
+        }
+
+        transformPipelineSelectedIndex = index;
+        optionElement.classList.add('active');
+    }
+
     function setupColorCipher(data) {
         const revealDuration = Number.parseInt(data.reveal_duration, 10);
         const revealSeconds = Number.isFinite(revealDuration) && revealDuration > 0 ? revealDuration : 3;
@@ -1863,6 +2011,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
                 break;
+            case 'transform_pipeline_select':
+                answerData.answer = transformPipelineSelectedIndex;
+                if (transformPipelineSelectedIndex === null) {
+                    showError('Select the correct transformed image.');
+                    resetCustomSubmitButtons();
+                    return;
+                }
+                break;
             case 'color_cipher':
                 if (!userAnswerInput.value.trim()) {
                     showError('Enter your answer before submitting.');
@@ -1997,6 +2153,12 @@ document.addEventListener('DOMContentLoaded', () => {
             squiggleButton.textContent = 'Submit';
         }
 
+        const transformPipelineButton = document.querySelector('.submit-transform-pipeline');
+        if (transformPipelineButton) {
+            transformPipelineButton.disabled = false;
+            transformPipelineButton.textContent = 'Submit';
+        }
+
         const storyboardButton = document.querySelector('.submit-storyboard');
         if (storyboardButton) {
             storyboardButton.disabled = false;
@@ -2047,6 +2209,7 @@ document.addEventListener('DOMContentLoaded', () => {
             Red_Dot: 4,
             Storyboard_Logic: 3,
             Jigsaw_Puzzle: 2,
+            Transform_Pipeline: 4,
         };
 
         const difficulty = difficultyRatings[puzzleType] || 1;

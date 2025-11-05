@@ -1230,6 +1230,178 @@ body {
     }
 }
 
+/* Transform Pipeline puzzle */
+.transform-pipeline-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    padding: 20px;
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.transform-pipeline-reference {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+}
+
+.transform-pipeline-steps {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    background-color: #f8f9fa;
+    padding: 16px;
+    border-radius: 8px;
+    border: 2px solid #e2e8f0;
+}
+
+.transform-pipeline-label {
+    font-weight: 600;
+    font-size: 18px;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.transform-pipeline-ref-image {
+    max-width: 100%;
+    max-height: 300px;
+    object-fit: contain;
+    border-radius: 8px;
+    background-color: #ffffff;
+    border: 2px solid #e2e8f0;
+    padding: 8px;
+}
+
+.transform-pipeline-steps-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    text-align: left;
+}
+
+.transform-pipeline-step {
+    padding: 10px 16px;
+    background-color: #ffffff;
+    border-radius: 6px;
+    border-left: 4px solid var(--primary-color);
+    font-size: 16px;
+    color: var(--text-primary);
+    line-height: 1.5;
+}
+
+.transform-pipeline-options-grid {
+    display: grid;
+    gap: 24px;
+    width: 100%;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0 20px;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    justify-content: center;
+}
+
+.transform-pipeline-option {
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    background-color: #ffffff;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    min-height: 200px;
+    aspect-ratio: 4 / 3;
+    max-width: 100%;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.transform-pipeline-option img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background-color: #ffffff;
+    padding: 8px;
+}
+
+.transform-pipeline-option:hover {
+    transform: translateY(-2px);
+    border-color: var(--primary-color);
+    box-shadow: 0 8px 20px rgba(99, 102, 241, 0.25);
+}
+
+.transform-pipeline-option.active {
+    border-color: var(--primary-color);
+    box-shadow: 0 10px 24px rgba(99, 102, 241, 0.35);
+    background-color: rgba(99, 102, 241, 0.05);
+}
+
+.transform-pipeline-submit {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    margin-top: 24px;
+}
+
+.submit-transform-pipeline {
+    padding: 14px 32px;
+    background-color: var(--primary-color);
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    font-size: 17px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 6px 16px rgba(99, 102, 241, 0.3);
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.submit-transform-pipeline:hover {
+    background-color: var(--primary-dark);
+    transform: translateY(-1px);
+}
+
+.submit-transform-pipeline:disabled {
+    background-color: #95a5a6;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.puzzle-image-container:has(.transform-pipeline-container) {
+    display: block;
+    flex-direction: column;
+}
+
+@media (max-width: 600px) {
+    .transform-pipeline-options-grid {
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 20px;
+        padding: 0 10px;
+    }
+
+    .transform-pipeline-container {
+        padding: 16px;
+    }
+
+    .transform-pipeline-ref-image {
+        max-height: 200px;
+    }
+
+    .transform-pipeline-step {
+        font-size: 14px;
+        padding: 8px 12px;
+    }
+}
+
 /* Color Cipher puzzle */
 .color-cipher-preview {
     display: flex;

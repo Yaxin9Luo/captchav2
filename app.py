@@ -37,13 +37,15 @@ PUZZLE_TYPE_SEQUENCE = [
     # 'Spooky_Text',
     # 'Red_Dot',
     # 'Storyboard_Logic',
-    'Jigsaw_Puzzle',
+    # 'Jigsaw_Puzzle',
+    'Transform_Pipeline',
 ]
 sequential_index = 0
 
 active_red_dot_puzzles: dict[str, dict] = {}
 active_spooky_size_puzzles: dict[str, dict] = {}
 active_jigsaw_puzzles: dict[str, dict] = {}
+active_transform_pipeline_puzzles: dict[str, dict] = {}
 
 COLOR_SYMBOL_POOL = [
     ("🟥", "red"),
@@ -464,6 +466,917 @@ def generate_jigsaw_puzzle(config: dict) -> dict:
     }
 
 
+def generate_transform_pipeline(config: dict) -> dict:
+    """Generate a Transform Pipeline puzzle using SVG templates with randomized variations."""  
+    import json as json_module
+    
+    # Color definitions
+    COL = {
+        "red": "#E53935",
+        "blue": "#1E88E5",
+        "green": "#43A047",
+        "purple": "#8E24AA",
+        "orange": "#FB8C00",
+        "cyan": "#26C6DA",
+        "pink": "#EC407A",
+        "black": "#000000",
+        "white": "#FFFFFF",
+        "yellow": "#FDD835",
+        "brown": "#8D6E63",
+        "teal": "#00897B",
+        "gray": "#757575"
+    }
+    
+    # Available colors for randomization (excluding black/white for some templates)
+    COLOR_POOL = ["red", "blue", "green", "purple", "orange", "cyan", "pink", "yellow", "brown", "teal"]
+    
+    # Determine if we should use random pipelines or fixed ones
+    use_random_pipelines = config.get("use_random_pipelines", True)
+    
+    # Template types and their initial states
+    # Templates with their color capacity (how many colors they can display)
+    TEMPLATE_COLOR_CAPACITY = {
+        "lshape": 2,  # color, bg
+        "arrow_circle": 3,  # arrow, ring, bg
+        "pacman": 3,  # body, eye, bg
+        "circle": 2,  # fill, bg
+        "square": 2,  # fill, bg
+        "triangle": 2,  # fill, bg
+        "star": 2,  # fill, bg
+        "diamond": 2  # fill, bg
+    }
+    
+    available_templates = config.get("templates", list(TEMPLATE_COLOR_CAPACITY.keys()))
+    
+    # Define generate_random_pipeline function before it's used
+    def generate_random_pipeline(color_pool):
+        """Generate a random transformation pipeline."""
+        pipeline = []
+        num_steps = random.randint(2, 4)  # 2-4 steps
+        
+        # Available operations
+        operations = []
+        
+        # Always include some rotation
+        if random.random() < 0.8:  # 80% chance
+            rotations = [90, -90, 180, 270, -270]
+            operations.append(("rotate", random.choice(rotations)))
+        
+        # Mirror operations
+        if random.random() < 0.7:  # 70% chance
+            operations.append(("mirror_h", None))
+        if random.random() < 0.7:  # 70% chance
+            operations.append(("mirror_v", None))
+        
+        # Color mapping
+        if random.random() < 0.8:  # 80% chance
+            num_mappings = random.randint(1, 3)
+            color_map = {}
+            available_colors = color_pool.copy()
+            for _ in range(num_mappings):
+                if len(available_colors) < 2:
+                    break
+                src_color = random.choice(available_colors)
+                available_colors.remove(src_color)
+                dst_color = random.choice(available_colors)
+                color_map[src_color] = dst_color
+            if color_map:
+                operations.append(("map_colors", color_map))
+        
+        # Randomly select and shuffle operations
+        selected_ops = random.sample(operations, min(num_steps, len(operations))) if operations else []
+        random.shuffle(selected_ops)
+        
+        return selected_ops if selected_ops else [("rotate", 90), ("mirror_h", None)]  # Fallback
+    
+    # If using random pipelines, check how many color mappings we have
+    if use_random_pipelines:
+        # Generate pipeline first to see how many color mappings it has
+        pipeline = generate_random_pipeline(COLOR_POOL)
+        
+        # Count unique colors in color mappings
+        color_mappings = [arg for op, arg in pipeline if op == "map_colors"]
+        num_mapped_colors = 0
+        num_pool_colors = 0  # Count non-black/white colors
+        if color_mappings:
+            source_colors = set()
+            for mapping in color_mappings:
+                source_colors.update(mapping.keys())
+            num_mapped_colors = len(source_colors)
+            # Count how many are pool colors (not black/white)
+            num_pool_colors = len([c for c in source_colors if c in COLOR_POOL])
+        
+        # Prefer templates that can accommodate all mapped colors
+        # If we have 2+ pool colors (non-black/white), we need 3-color templates
+        # because 2-color templates can only show 1 pool color (fill) + 1 black/white (bg)
+        if num_pool_colors >= 2:
+            # Need at least 3 color properties to show 2+ pool colors
+            suitable_templates = [t for t in available_templates 
+                                if t in TEMPLATE_COLOR_CAPACITY 
+                                and TEMPLATE_COLOR_CAPACITY[t] >= 3]
+            if suitable_templates:
+                template_name = random.choice(suitable_templates)
+            else:
+                template_name = random.choice(available_templates)
+        elif num_mapped_colors > 2:
+            # Need at least 3 color properties
+            suitable_templates = [t for t in available_templates 
+                                if t in TEMPLATE_COLOR_CAPACITY 
+                                and TEMPLATE_COLOR_CAPACITY[t] >= num_mapped_colors]
+            if suitable_templates:
+                template_name = random.choice(suitable_templates)
+            else:
+                template_name = random.choice(available_templates)
+        else:
+            template_name = random.choice(available_templates)
+    else:
+        template_name = random.choice(available_templates)
+    
+    # Pipeline definitions (can be customized via config)
+    default_pipelines = {
+        "lshape": [
+            ("rotate", 90),
+            ("map_colors", {"red": "blue"}),
+            ("mirror_h", None)
+        ],
+        "arrow_circle": [
+            ("mirror_v", None),
+            ("map_colors", {"green": "purple", "white": "black", "black": "white"}),
+            ("rotate", 180)
+        ],
+        "pacman": [
+            ("rotate", -90),
+            ("map_colors", {"yellow": "cyan", "black": "white"}),
+            ("mirror_h", None)
+        ]
+    }
+    
+    # Generate random pipeline if enabled (pipeline was already generated above if use_random_pipelines)
+    if not use_random_pipelines:
+        pipelines_config = config.get("pipelines", default_pipelines)
+        # Convert JSON arrays to tuples for pipeline operations
+        if isinstance(pipelines_config, dict):
+            pipeline_raw = pipelines_config.get(template_name, pipelines_config.get("lshape", default_pipelines["lshape"]))
+            # Convert list format from JSON to tuple format
+            pipeline = []
+            for item in pipeline_raw:
+                if isinstance(item, list) and len(item) == 2:
+                    op, arg = item
+                    # Convert null to None
+                    if arg is None or (isinstance(arg, str) and arg.lower() == "null"):
+                        pipeline.append((op, None))
+                    else:
+                        pipeline.append((op, arg))
+                else:
+                    pipeline.append(item)
+        else:
+            pipeline = pipelines_config.get(template_name, default_pipelines["lshape"])
+    
+    
+    # Helper functions for SVG generation
+    def svg_header(w=256, h=256):
+        return f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}">\n'
+    
+    def svg_bg(color="#FFFFFF", w=256, h=256):
+        return f'<rect x="0" y="0" width="{w}" height="{h}" fill="{color}"/>\n'
+    
+    def svg_footer():
+        return "</svg>\n"
+    
+    # L-shape template functions
+    ORIENTS = ["└", "┌", "┐", "┘"]
+    
+    def lshape_rotate(o, deg):
+        idx = ORIENTS.index(o)
+        steps = (deg // 90) % 4
+        return ORIENTS[(idx + steps) % 4]
+    
+    def lshape_mirror_h(o):
+        return {"└": "┘", "┘": "└", "┌": "┐", "┐": "┌"}[o]
+    
+    def lshape_mirror_v(o):
+        return {"└": "┌", "┌": "└", "┘": "┐", "┐": "┘"}[o]
+    
+    def draw_lshape(orientation="└", fill=COL["red"], stroke=None):
+        t = 56
+        shapes = []
+        if orientation == "└":
+            shapes.append(f'<rect x="60" y="44" width="{t}" height="156" fill="{fill}"/>\n')
+            shapes.append(f'<rect x="60" y="{44+156-t}" width="156" height="{t}" fill="{fill}"/>\n')
+        elif orientation == "┌":
+            shapes.append(f'<rect x="60" y="44" width="{t}" height="156" fill="{fill}"/>\n')
+            shapes.append(f'<rect x="60" y="44" width="156" height="{t}" fill="{fill}"/>\n')
+        elif orientation == "┐":
+            shapes.append(f'<rect x="{60+156-t}" y="44" width="{t}" height="156" fill="{fill}"/>\n')
+            shapes.append(f'<rect x="60" y="44" width="156" height="{t}" fill="{fill}"/>\n')
+        elif orientation == "┘":
+            shapes.append(f'<rect x="{60+156-t}" y="44" width="{t}" height="156" fill="{fill}"/>\n')
+            shapes.append(f'<rect x="60" y="{44+156-t}" width="156" height="{t}" fill="{fill}"/>\n')
+        return "".join(shapes)
+    
+    def lshape_make_scene(orientation="└", color="red", bg="white"):
+        svg = svg_header()
+        svg += svg_bg(COL[bg])
+        svg += draw_lshape(orientation, COL[color])
+        svg += svg_footer()
+        return svg
+    
+    # Arrow in circle template functions
+    def arrow_polygon_points(direction="right"):
+        cx, cy = 128, 128
+        shaft_len, shaft_w, head_len = 90, 24, 36
+        if direction == "right":
+            x0, x1, x2 = cx-60, cx+30, cx+30+head_len
+            y0, y1 = cy - shaft_w/2, cy + shaft_w/2
+            pts = [(x0,y0),(x1,y0),(x1,cy-18),(x2,cy),(x1,cy+18),(x1,y1),(x0,y1)]
+        elif direction == "left":
+            x0, x1, x2 = cx+60, cx-30, cx-30-head_len
+            y0, y1 = cy - shaft_w/2, cy + shaft_w/2
+            pts = [(x0,y0),(x1,y0),(x1,cy-18),(x2,cy),(x1,cy+18),(x1,y1),(x0,y1)]
+        elif direction == "up":
+            y0, y1, y2 = cy+60, cy-30, cy-30-head_len
+            x0, x1 = cx - shaft_w/2, cx + shaft_w/2
+            pts = [(x0,y0),(x0,y1),(cx-18,y1),(cx,y2),(cx+18,y1),(x1,y1),(x1,y0)]
+        elif direction == "down":
+            y0, y1, y2 = cy-60, cy+30, cy+30+head_len
+            x0, x1 = cx - shaft_w/2, cx + shaft_w/2
+            pts = [(x0,y0),(x0,y1),(cx-18,y1),(cx,y2),(cx+18,y1),(x1,y1),(x1,y0)]
+        return pts
+    
+    def points_to_path(pts):
+        return " ".join([f"{'L' if i else 'M'}{x:.1f},{y:.1f}" for i,(x,y) in enumerate(pts)]) + " Z"
+    
+    def draw_arrow_in_circle(direction="right", bg="white", ring_stroke="black", arrow_fill="green"):
+        svg = svg_header()
+        svg += svg_bg(COL[bg])
+        svg += f'<circle cx="128" cy="128" r="92" fill="none" stroke="{COL[ring_stroke]}" stroke-width="4"/>\n'
+        pts = arrow_polygon_points(direction)
+        path = points_to_path(pts)
+        svg += f'<path d="{path}" fill="{COL[arrow_fill]}"/>\n'
+        svg += svg_footer()
+        return svg
+    
+    # Pacman template functions
+    def draw_pacman(orientation="right", body_fill="yellow", eye_fill="black", bg="white"):
+        svg = svg_header()
+        svg += svg_bg(COL[bg])
+        cx, cy, r = 128, 128, 92
+        dir_angle = {"right":0, "up":-90, "left":180, "down":90}[orientation]
+        mouth = 60
+        a0 = math.radians(dir_angle - mouth/2)
+        a1 = math.radians(dir_angle + mouth/2)
+        x0, y0 = cx + r*math.cos(a0), cy + r*math.sin(a0)
+        x1, y1 = cx + r*math.cos(a1), cy + r*math.sin(a1)
+        d = f"M{cx},{cy} L{x0:.1f},{y0:.1f} A{r},{r} 0 0,1 {x1:.1f},{y1:.1f} Z"
+        svg += f'<path d="{d}" fill="{COL.get(body_fill, body_fill)}"/>\n'
+        eye_angle = math.radians(dir_angle - 60)
+        ex, ey = cx + 30*math.cos(eye_angle), cy + 30*math.sin(eye_angle)
+        svg += f'<circle cx="{ex:.1f}" cy="{ey:.1f}" r="8" fill="{COL.get(eye_fill, eye_fill)}"/>\n'
+        svg += svg_footer()
+        return svg
+    
+    # Additional shape drawing functions
+    def draw_circle(center_x=128, center_y=128, radius=80, fill=COL["blue"], bg="white"):
+        svg = svg_header()
+        svg += svg_bg(COL[bg])
+        svg += f'<circle cx="{center_x}" cy="{center_y}" r="{radius}" fill="{fill}"/>\n'
+        svg += svg_footer()
+        return svg
+    
+    def draw_square(center_x=128, center_y=128, size=120, fill=COL["green"], bg="white", rotation=0):
+        svg = svg_header()
+        svg += svg_bg(COL[bg])
+        half = size / 2
+        if rotation != 0:
+            svg += f'<g transform="rotate({rotation} {center_x} {center_y})">\n'
+            svg += f'<rect x="{center_x - half}" y="{center_y - half}" width="{size}" height="{size}" fill="{fill}"/>\n'
+            svg += '</g>\n'
+        else:
+            svg += f'<rect x="{center_x - half}" y="{center_y - half}" width="{size}" height="{size}" fill="{fill}"/>\n'
+        svg += svg_footer()
+        return svg
+    
+    def draw_triangle(center_x=128, center_y=128, size=100, fill=COL["purple"], bg="white", orientation="up"):
+        svg = svg_header()
+        svg += svg_bg(COL[bg])
+        h = size * math.sqrt(3) / 2
+        if orientation == "up":
+            pts = [(center_x, center_y - h*2/3), (center_x - size/2, center_y + h/3), (center_x + size/2, center_y + h/3)]
+        elif orientation == "down":
+            pts = [(center_x, center_y + h*2/3), (center_x - size/2, center_y - h/3), (center_x + size/2, center_y - h/3)]
+        elif orientation == "left":
+            pts = [(center_x - h*2/3, center_y), (center_x + h/3, center_y - size/2), (center_x + h/3, center_y + size/2)]
+        else:  # right
+            pts = [(center_x + h*2/3, center_y), (center_x - h/3, center_y - size/2), (center_x - h/3, center_y + size/2)]
+        path = points_to_path(pts)
+        svg += f'<path d="{path}" fill="{fill}"/>\n'
+        svg += svg_footer()
+        return svg
+    
+    def draw_star(center_x=128, center_y=128, outer_radius=70, inner_radius=35, fill=COL["orange"], bg="white", rotation=0):
+        svg = svg_header()
+        svg += svg_bg(COL[bg])
+        points = []
+        for i in range(10):
+            angle = (math.pi * i) / 5 + math.radians(rotation) - math.pi / 2
+            radius = outer_radius if i % 2 == 0 else inner_radius
+            x = center_x + radius * math.cos(angle)
+            y = center_y + radius * math.sin(angle)
+            points.append((x, y))
+        path = points_to_path(points)
+        svg += f'<path d="{path}" fill="{fill}"/>\n'
+        svg += svg_footer()
+        return svg
+    
+    def draw_diamond(center_x=128, center_y=128, width=100, height=100, fill=COL["pink"], bg="white", rotation=0):
+        svg = svg_header()
+        svg += svg_bg(COL[bg])
+        w2, h2 = width / 2, height / 2
+        pts = [(center_x, center_y - h2), (center_x + w2, center_y), (center_x, center_y + h2), (center_x - w2, center_y)]
+        if rotation != 0:
+            svg += f'<g transform="rotate({rotation} {center_x} {center_y})">\n'
+            path = points_to_path(pts)
+            svg += f'<path d="{path}" fill="{fill}"/>\n'
+            svg += '</g>\n'
+        else:
+            path = points_to_path(pts)
+            svg += f'<path d="{path}" fill="{fill}"/>\n'
+        svg += svg_footer()
+        return svg
+    
+    # State management functions with randomization
+    use_random_initial_state = config.get("use_random_initial_state", True)
+    
+    def lshape_init():
+        if use_random_initial_state:
+            orientation = random.choice(ORIENTS)
+            color = random.choice(COLOR_POOL)
+            bg = random.choice(["white", "black"])
+        else:
+            orientation = "└"
+            color = "red"
+            bg = "white"
+        return {"type": "lshape", "orientation": orientation, "color": color, "bg": bg}
+    
+    def lshape_apply(state, op, arg):
+        s = state.copy()
+        if op == "rotate":
+            deg = arg if arg >= 0 else (360+arg)
+            s["orientation"] = lshape_rotate(s["orientation"], deg)
+        elif op == "mirror_h":
+            s["orientation"] = lshape_mirror_h(s["orientation"])
+        elif op == "mirror_v":
+            s["orientation"] = lshape_mirror_v(s["orientation"])
+        elif op == "map_colors":
+            s["color"] = arg.get(s["color"], s["color"])
+            s["bg"] = arg.get(s["bg"], s["bg"])
+        return s
+    
+    def lshape_render(state):
+        return lshape_make_scene(state["orientation"], state["color"], state["bg"])
+    
+    def arrow_init():
+        if use_random_initial_state:
+            dir = random.choice(["right", "down", "left", "up"])
+            bg = random.choice(["white", "black"])
+            ring = random.choice(["black", "white"])
+            arrow = random.choice(COLOR_POOL)
+        else:
+            dir = "right"
+            bg = "white"
+            ring = "black"
+            arrow = "green"
+        return {"type": "arrow", "dir": dir, "bg": bg, "ring": ring, "arrow": arrow}
+    
+    def apply_rotation_dir(direction, deg):
+        order = ["right", "down", "left", "up"]
+        idx = order.index(direction)
+        steps = (deg // 90) % 4
+        return order[(idx + steps) % 4]
+    
+    def mirror_direction_h(direction):
+        return {"right": "left", "left": "right", "up": "up", "down": "down"}[direction]
+    
+    def mirror_direction_v(direction):
+        return {"up": "down", "down": "up", "left": "left", "right": "right"}[direction]
+    
+    def arrow_apply(state, op, arg):
+        s = state.copy()
+        if op == "rotate":
+            deg = arg if arg >= 0 else (360+arg)
+            s["dir"] = apply_rotation_dir(s["dir"], deg)
+        elif op == "mirror_h":
+            s["dir"] = mirror_direction_h(s["dir"])
+        elif op == "mirror_v":
+            s["dir"] = mirror_direction_v(s["dir"])
+        elif op == "map_colors":
+            for k in ["bg", "ring", "arrow"]:
+                s[k] = arg.get(s[k], s[k])
+        return s
+    
+    def arrow_render(state):
+        return draw_arrow_in_circle(direction=state["dir"], bg=state["bg"], ring_stroke=state["ring"], arrow_fill=state["arrow"])
+    
+    def pacman_init():
+        if use_random_initial_state:
+            dir = random.choice(["right", "down", "left", "up"])
+            body = random.choice(COLOR_POOL)
+            eye = random.choice(["black", "white"])
+            bg = random.choice(["white", "black"])
+        else:
+            dir = "right"
+            body = "yellow"
+            eye = "black"
+            bg = "white"
+        return {"type": "pacman", "dir": dir, "body": body, "eye": eye, "bg": bg}
+    
+    def pacman_apply(state, op, arg):
+        s = state.copy()
+        if op == "rotate":
+            deg = arg if arg >= 0 else (360+arg)
+            s["dir"] = apply_rotation_dir(s["dir"], deg)
+        elif op == "mirror_h":
+            s["dir"] = mirror_direction_h(s["dir"])
+        elif op == "mirror_v":
+            s["dir"] = mirror_direction_v(s["dir"])
+        elif op == "map_colors":
+            for k in ["body", "eye", "bg"]:
+                s[k] = arg.get(s[k], s[k])
+        return s
+    
+    def pacman_render(state):
+        return draw_pacman(orientation=state["dir"], body_fill=state["body"], eye_fill=state["eye"], bg=state["bg"])
+    
+    # New template initializers and renderers
+    def circle_init():
+        if use_random_initial_state:
+            radius = random.randint(60, 100)
+            center_x = random.randint(100, 156)
+            center_y = random.randint(100, 156)
+            fill = random.choice(COLOR_POOL)
+            bg = random.choice(["white", "black"])
+        else:
+            radius = 80
+            center_x = 128
+            center_y = 128
+            fill = "blue"
+            bg = "white"
+        return {"type": "circle", "center_x": center_x, "center_y": center_y, "radius": radius, "fill": fill, "bg": bg}
+    
+    def circle_apply(state, op, arg):
+        s = state.copy()
+        if op == "rotate":
+            # For circle, rotation doesn't change appearance, but we can swap center for effect
+            deg = arg if arg >= 0 else (360+arg)
+            if deg == 180:
+                # Flip position
+                s["center_x"] = 256 - s["center_x"]
+                s["center_y"] = 256 - s["center_y"]
+        elif op == "mirror_h":
+            s["center_x"] = 256 - s["center_x"]
+        elif op == "mirror_v":
+            s["center_y"] = 256 - s["center_y"]
+        elif op == "map_colors":
+            s["fill"] = arg.get(s["fill"], s["fill"])
+            s["bg"] = arg.get(s["bg"], s["bg"])
+        return s
+    
+    def circle_render(state):
+        return draw_circle(state["center_x"], state["center_y"], state["radius"], COL[state["fill"]], state["bg"])
+    
+    def square_init():
+        if use_random_initial_state:
+            size = random.randint(80, 140)
+            center_x = random.randint(100, 156)
+            center_y = random.randint(100, 156)
+            rotation = random.choice([0, 45, 90, 135])
+            fill = random.choice(COLOR_POOL)
+            bg = random.choice(["white", "black"])
+        else:
+            size = 120
+            center_x = 128
+            center_y = 128
+            rotation = 0
+            fill = "green"
+            bg = "white"
+        return {"type": "square", "center_x": center_x, "center_y": center_y, "size": size, "rotation": rotation, "fill": fill, "bg": bg}
+    
+    def square_apply(state, op, arg):
+        s = state.copy()
+        if op == "rotate":
+            deg = arg if arg >= 0 else (360+arg)
+            s["rotation"] = (s["rotation"] + deg) % 360
+        elif op == "mirror_h":
+            s["rotation"] = (360 - s["rotation"]) % 360
+            s["center_x"] = 256 - s["center_x"]
+        elif op == "mirror_v":
+            s["rotation"] = (180 - s["rotation"]) % 360
+            s["center_y"] = 256 - s["center_y"]
+        elif op == "map_colors":
+            s["fill"] = arg.get(s["fill"], s["fill"])
+            s["bg"] = arg.get(s["bg"], s["bg"])
+        return s
+    
+    def square_render(state):
+        return draw_square(state["center_x"], state["center_y"], state["size"], COL[state["fill"]], state["bg"], state["rotation"])
+    
+    def triangle_init():
+        if use_random_initial_state:
+            size = random.randint(70, 120)
+            center_x = random.randint(100, 156)
+            center_y = random.randint(100, 156)
+            orientation = random.choice(["up", "down", "left", "right"])
+            fill = random.choice(COLOR_POOL)
+            bg = random.choice(["white", "black"])
+        else:
+            size = 100
+            center_x = 128
+            center_y = 128
+            orientation = "up"
+            fill = "purple"
+            bg = "white"
+        return {"type": "triangle", "center_x": center_x, "center_y": center_y, "size": size, "orientation": orientation, "fill": fill, "bg": bg}
+    
+    def triangle_apply(state, op, arg):
+        s = state.copy()
+        orient_order = ["up", "right", "down", "left"]
+        if op == "rotate":
+            deg = arg if arg >= 0 else (360+arg)
+            steps = (deg // 90) % 4
+            idx = orient_order.index(s["orientation"])
+            s["orientation"] = orient_order[(idx + steps) % 4]
+        elif op == "mirror_h":
+            s["orientation"] = {"up": "up", "down": "down", "left": "right", "right": "left"}[s["orientation"]]
+            s["center_x"] = 256 - s["center_x"]
+        elif op == "mirror_v":
+            s["orientation"] = {"left": "left", "right": "right", "up": "down", "down": "up"}[s["orientation"]]
+            s["center_y"] = 256 - s["center_y"]
+        elif op == "map_colors":
+            s["fill"] = arg.get(s["fill"], s["fill"])
+            s["bg"] = arg.get(s["bg"], s["bg"])
+        return s
+    
+    def triangle_render(state):
+        return draw_triangle(state["center_x"], state["center_y"], state["size"], COL[state["fill"]], state["bg"], state["orientation"])
+    
+    def star_init():
+        if use_random_initial_state:
+            outer_radius = random.randint(60, 85)
+            inner_radius = random.randint(25, outer_radius // 2)
+            center_x = random.randint(100, 156)
+            center_y = random.randint(100, 156)
+            rotation = random.randint(0, 359)
+            fill = random.choice(COLOR_POOL)
+            bg = random.choice(["white", "black"])
+        else:
+            outer_radius = 70
+            inner_radius = 35
+            center_x = 128
+            center_y = 128
+            rotation = 0
+            fill = "orange"
+            bg = "white"
+        return {"type": "star", "center_x": center_x, "center_y": center_y, "outer_radius": outer_radius, "inner_radius": inner_radius, "rotation": rotation, "fill": fill, "bg": bg}
+    
+    def star_apply(state, op, arg):
+        s = state.copy()
+        if op == "rotate":
+            deg = arg if arg >= 0 else (360+arg)
+            s["rotation"] = (s["rotation"] + deg) % 360
+        elif op == "mirror_h":
+            s["rotation"] = (360 - s["rotation"]) % 360
+            s["center_x"] = 256 - s["center_x"]
+        elif op == "mirror_v":
+            s["rotation"] = (180 - s["rotation"]) % 360
+            s["center_y"] = 256 - s["center_y"]
+        elif op == "map_colors":
+            s["fill"] = arg.get(s["fill"], s["fill"])
+            s["bg"] = arg.get(s["bg"], s["bg"])
+        return s
+    
+    def star_render(state):
+        return draw_star(state["center_x"], state["center_y"], state["outer_radius"], state["inner_radius"], COL[state["fill"]], state["bg"], state["rotation"])
+    
+    def diamond_init():
+        if use_random_initial_state:
+            width = random.randint(80, 130)
+            height = random.randint(80, 130)
+            center_x = random.randint(100, 156)
+            center_y = random.randint(100, 156)
+            rotation = random.choice([0, 45, 90, 135])
+            fill = random.choice(COLOR_POOL)
+            bg = random.choice(["white", "black"])
+        else:
+            width = 100
+            height = 100
+            center_x = 128
+            center_y = 128
+            rotation = 0
+            fill = "pink"
+            bg = "white"
+        return {"type": "diamond", "center_x": center_x, "center_y": center_y, "width": width, "height": height, "rotation": rotation, "fill": fill, "bg": bg}
+    
+    def diamond_apply(state, op, arg):
+        s = state.copy()
+        if op == "rotate":
+            deg = arg if arg >= 0 else (360+arg)
+            s["rotation"] = (s["rotation"] + deg) % 360
+        elif op == "mirror_h":
+            s["rotation"] = (360 - s["rotation"]) % 360
+            s["center_x"] = 256 - s["center_x"]
+        elif op == "mirror_v":
+            s["rotation"] = (180 - s["rotation"]) % 360
+            s["center_y"] = 256 - s["center_y"]
+        elif op == "map_colors":
+            s["fill"] = arg.get(s["fill"], s["fill"])
+            s["bg"] = arg.get(s["bg"], s["bg"])
+        return s
+    
+    def diamond_render(state):
+        return draw_diamond(state["center_x"], state["center_y"], state["width"], state["height"], COL[state["fill"]], state["bg"], state["rotation"])
+    
+    # Template registry
+    template_registry = {
+        "lshape": (lshape_init, lshape_apply, lshape_render),
+        "arrow_circle": (arrow_init, arrow_apply, arrow_render),
+        "pacman": (pacman_init, pacman_apply, pacman_render),
+        "circle": (circle_init, circle_apply, circle_render),
+        "square": (square_init, square_apply, square_render),
+        "triangle": (triangle_init, triangle_apply, triangle_render),
+        "star": (star_init, star_apply, star_render),
+        "diamond": (diamond_init, diamond_apply, diamond_render)
+    }
+    
+    # Handle unknown templates gracefully
+    if template_name not in template_registry:
+        template_name = "lshape"  # Fallback to lshape
+    
+    init_fn, apply_fn, render_fn = template_registry[template_name]
+    
+    # Generate initial state
+    state0 = init_fn()
+    
+    # If pipeline has color mappings, ensure initial state uses ALL colors that will be affected
+    # This ensures ALL color mapping steps are visible
+    color_mappings = [arg for op, arg in pipeline if op == "map_colors"]
+    if color_mappings and use_random_initial_state:
+        # Get all source colors from mappings - we need ALL of them visible
+        source_colors_list = []
+        for mapping in color_mappings:
+            source_colors_list.extend(mapping.keys())
+        source_colors = list(set(source_colors_list))  # Remove duplicates
+        
+        # Separate colors into COLOR_POOL colors and black/white
+        pool_colors = [c for c in source_colors if c in COLOR_POOL]
+        bw_colors = [c for c in source_colors if c in ["black", "white"]]
+        
+        # Ensure ALL mapped colors are assigned to visible properties
+        # Different templates have different color properties
+        if template_name == "lshape":
+            # Can use: color, bg (2 colors)
+            if len(pool_colors) >= 1:
+                state0["color"] = pool_colors[0]
+            elif len(source_colors) >= 1:
+                state0["color"] = source_colors[0] if source_colors[0] in COLOR_POOL else random.choice(COLOR_POOL)
+            if len(bw_colors) >= 1:
+                state0["bg"] = bw_colors[0]
+            elif len(pool_colors) >= 2:
+                # Use second pool color even if not black/white - better than missing a mapping
+                state0["bg"] = pool_colors[1] if pool_colors[1] in ["white", "black"] else random.choice(["white", "black"])
+            elif len(source_colors) >= 2:
+                state0["bg"] = source_colors[1] if source_colors[1] in ["white", "black"] else random.choice(["white", "black"])
+        elif template_name == "arrow_circle":
+            # Can use: arrow, ring, bg (3 colors!)
+            # Strategy: Assign pool colors to arrow and ring/bg to ensure ALL pool colors are visible
+            if len(pool_colors) >= 1:
+                state0["arrow"] = pool_colors[0]  # First pool color goes to arrow
+            elif len(source_colors) >= 1:
+                state0["arrow"] = source_colors[0] if source_colors[0] in COLOR_POOL else random.choice(COLOR_POOL)
+            # For ring and bg: prioritize showing second pool color if we have 2+
+            if len(pool_colors) >= 2:
+                # We have 2+ pool colors - assign second to ring so both are visible
+                state0["ring"] = pool_colors[1]
+                # bg can be black/white or third pool color
+                if len(bw_colors) >= 1:
+                    state0["bg"] = bw_colors[0]
+                elif len(pool_colors) >= 3:
+                    state0["bg"] = pool_colors[2]
+                else:
+                    state0["bg"] = random.choice(["white", "black"])
+            elif len(bw_colors) >= 1:
+                # Only 1 pool color, use black/white for ring
+                state0["ring"] = bw_colors[0]
+                if len(bw_colors) >= 2:
+                    state0["bg"] = bw_colors[1]
+                else:
+                    state0["bg"] = random.choice(["white", "black"])
+            elif len(source_colors) >= 2:
+                state0["ring"] = source_colors[1] if source_colors[1] in ["black", "white"] else random.choice(["black", "white"])
+                state0["bg"] = random.choice(["white", "black"])
+            else:
+                state0["ring"] = random.choice(["black", "white"])
+                state0["bg"] = random.choice(["white", "black"])
+        elif template_name == "pacman":
+            # Can use: body, eye, bg (3 colors!)
+            # Strategy: Assign pool colors to body and eye/bg to ensure ALL pool colors are visible
+            if len(pool_colors) >= 1:
+                state0["body"] = pool_colors[0]  # First pool color goes to body
+            elif len(source_colors) >= 1:
+                state0["body"] = source_colors[0] if source_colors[0] in COLOR_POOL else random.choice(COLOR_POOL)
+            # For eye and bg: prioritize showing second pool color if we have 2+
+            if len(pool_colors) >= 2:
+                # We have 2+ pool colors - assign second to eye so both are visible
+                state0["eye"] = pool_colors[1]
+                # bg can be black/white or third pool color
+                if len(bw_colors) >= 1:
+                    state0["bg"] = bw_colors[0]
+                elif len(pool_colors) >= 3:
+                    state0["bg"] = pool_colors[2]
+                else:
+                    state0["bg"] = random.choice(["white", "black"])
+            elif len(bw_colors) >= 1:
+                # Only 1 pool color, use black/white for eye
+                state0["eye"] = bw_colors[0]
+                if len(bw_colors) >= 2:
+                    state0["bg"] = bw_colors[1]
+                else:
+                    state0["bg"] = random.choice(["white", "black"])
+            elif len(source_colors) >= 2:
+                state0["eye"] = source_colors[1] if source_colors[1] in ["black", "white"] else random.choice(["black", "white"])
+                state0["bg"] = random.choice(["white", "black"])
+            else:
+                state0["eye"] = random.choice(["black", "white"])
+                state0["bg"] = random.choice(["white", "black"])
+        elif template_name in ["circle", "square", "triangle", "star", "diamond"]:
+            # Can use: fill, bg (2 colors only)
+            # IMPORTANT: For 2-color templates with 2+ pool colors, we can only show 1 pool color
+            # So we need to ensure the template selection prefers 3-color templates for 2+ pool colors
+            # But if we end up here, prioritize showing at least one pool color
+            if len(pool_colors) >= 1:
+                state0["fill"] = pool_colors[0]  # Show first pool color
+            elif len(source_colors) >= 1:
+                state0["fill"] = source_colors[0] if source_colors[0] in COLOR_POOL else random.choice(COLOR_POOL)
+            # For bg, prioritize black/white if available, otherwise use second pool color
+            if len(bw_colors) >= 1:
+                state0["bg"] = bw_colors[0]
+            elif len(pool_colors) >= 2:
+                # If we have 2+ pool colors but only 2-color template, use second pool color for bg
+                # This ensures both colors are visible (though bg usually isn't pool colors)
+                state0["bg"] = pool_colors[1] if pool_colors[1] in ["white", "black"] else random.choice(["white", "black"])
+            elif len(source_colors) >= 2:
+                state0["bg"] = source_colors[1] if source_colors[1] in ["white", "black"] else random.choice(["white", "black"])
+    
+    # Apply pipeline to get correct state
+    def apply_pipeline(state, pipeline, appliers):
+        s = state.copy()  # Make a copy to avoid mutating the original
+        for op, arg in pipeline:
+            s = appliers(s, op, arg)
+        return s
+    
+    correct_state = apply_pipeline(state0, pipeline, apply_fn)
+    
+    # Generate distractors
+    def make_distractors(state, pipeline, appliers):
+        distractors = []
+        # Skip last step
+        s = state
+        for i, (op, arg) in enumerate(pipeline):
+            if i < len(pipeline) - 1:
+                s = appliers(s, op, arg)
+        distractors.append(("skip_last", s))
+        # Skip middle step
+        s = state
+        for i, (op, arg) in enumerate(pipeline):
+            if i == 1:
+                continue
+            s = appliers(s, op, arg)
+        distractors.append(("skip_middle", s))
+        # Skip first step
+        s = state
+        for i, (op, arg) in enumerate(pipeline):
+            if i == 0:
+                continue
+            s = appliers(s, op, arg)
+        distractors.append(("skip_first", s))
+        # Wrong rotation direction
+        if pipeline[0][0] == "rotate":
+            wrong = state.copy()
+            op, arg = pipeline[0]
+            wrong = appliers(wrong, op, -arg if isinstance(arg, int) else arg)
+            for op2, arg2 in pipeline[1:]:
+                wrong = appliers(wrong, op2, arg2)
+            distractors.append(("wrong_rot_dir", wrong))
+        # No color map
+        has_map = any(op == "map_colors" for op, _ in pipeline)
+        if has_map:
+            s = state.copy()
+            for op, arg in pipeline:
+                if op == "map_colors":
+                    continue
+                s = appliers(s, op, arg)
+            distractors.append(("no_color_map", s))
+        # Only first step
+        s = state.copy()
+        op, arg = pipeline[0]
+        s = appliers(s, op, arg)
+        distractors.append(("only_first", s))
+        return distractors
+    
+    distractors = make_distractors(state0, pipeline, apply_fn)
+    
+    # Render SVG to base64
+    def svg_to_data_url(svg_content):
+        svg_bytes = svg_content.encode('utf-8')
+        svg_b64 = base64.b64encode(svg_bytes).decode('utf-8')
+        return f"data:image/svg+xml;base64,{svg_b64}"
+    
+    # Render reference image
+    reference_svg = render_fn(state0)
+    reference_data_url = svg_to_data_url(reference_svg)
+    
+    # Collect options
+    def fingerprint(s):
+        return json_module.dumps(s, sort_keys=True)
+    
+    options_states = [correct_state]
+    used = {fingerprint(correct_state)}
+    
+    for name, st in distractors:
+        fp = fingerprint(st)
+        if fp not in used:
+            used.add(fp)
+            options_states.append(st)
+        if len(options_states) >= 8:
+            break
+    
+    # Fill to 8 options if needed
+    while len(options_states) < 8 and distractors:
+        options_states.append(distractors[len(options_states) % len(distractors)][1])
+    
+    # Shuffle options
+    idxs = list(range(len(options_states)))
+    random.shuffle(idxs)
+    
+    correct_idx = None
+    option_data_urls = []
+    for i, opt_i in enumerate(idxs):
+        st = options_states[opt_i]
+        svg = render_fn(st)
+        option_data_urls.append(svg_to_data_url(svg))
+        if fingerprint(st) == fingerprint(correct_state):
+            correct_idx = i
+    
+    # Generate transform steps description
+    def serialize_steps(pipeline):
+        out = []
+        for op, arg in pipeline:
+            if op == "rotate":
+                if arg > 0:
+                    out.append(f"Rotate {arg}° clockwise")
+                else:
+                    out.append(f"Rotate {abs(arg)}° counterclockwise")
+            elif op == "mirror_h":
+                out.append("Horizontal mirror")
+            elif op == "mirror_v":
+                out.append("Vertical mirror")
+            elif op == "map_colors":
+                mapping = ", ".join([f"{k}→{v}" for k, v in arg.items()])
+                out.append(f"Color mapping: {mapping}")
+        return out
+    
+    transform_steps = serialize_steps(pipeline)
+    
+    # Generate puzzle ID
+    puzzle_id = f"transform_{int(time.time()*1000)}_{random.randint(1000,9999)}"
+    
+    # Store puzzle state for validation
+    active_transform_pipeline_puzzles[puzzle_id] = {
+        "correct_index": correct_idx,
+        "template": template_name,
+        "pipeline": pipeline,
+        "created_at": time.time()
+    }
+    
+    # Determine grid size based on number of options
+    num_options = len(option_data_urls)
+    if num_options <= 4:
+        grid_size = [2, 2]
+    elif num_options <= 6:
+        grid_size = [2, 3]
+    else:
+        grid_size = [2, 4]
+    
+    return {
+        "puzzle_id": puzzle_id,
+        "reference_image": reference_data_url,
+        "option_images": option_data_urls,
+        "transform_steps": transform_steps,
+        "answer": correct_idx,
+        "grid_size": grid_size,
+        "prompt": "After following the transform steps, what will be the last image?"
+    }
+
+
 def generate_red_dot(config: dict) -> dict:
     """Create a red dot reaction puzzle definition."""
     area_size = config.get("area_size", [420, 320])
@@ -776,6 +1689,11 @@ def get_puzzle():
             "prompt",
             "Drag the puzzle pieces to complete the jigsaw puzzle"
         )
+    elif puzzle_type == "Transform_Pipeline":
+        prompt = ground_truth[selected_puzzle].get(
+            "prompt",
+            "After following the transform steps, what will be the last image?"
+        )
     else:
         prompt = ground_truth[selected_puzzle].get("prompt", "Solve the CAPTCHA puzzle")
     
@@ -811,6 +1729,8 @@ def get_puzzle():
         input_type = "storyboard_logic"
     elif puzzle_type == "Jigsaw_Puzzle":
         input_type = "jigsaw_puzzle"
+    elif puzzle_type == "Transform_Pipeline":
+        input_type = "transform_pipeline_select"
     
     # For Rotation_Match, include additional data needed for the interface
     additional_data = {}
@@ -859,6 +1779,57 @@ def get_puzzle():
             "answer": ground_truth[selected_puzzle].get("answer"),
             "reveal_duration": ground_truth[selected_puzzle].get("reveal_duration", 3),
             "grid_size": ground_truth[selected_puzzle].get("grid_size")
+        }
+    elif puzzle_type == "Transform_Pipeline":
+        # Check if we should generate a random puzzle or use ground truth
+        use_generation = ground_truth.get("config", {}).get("generate_random", False)
+        
+        if use_generation:
+            # Generate random puzzle
+            try:
+                config = ground_truth.get("config", {})
+                puzzle = generate_transform_pipeline(config)
+                puzzle_id = puzzle["puzzle_id"]
+                
+                additional_data = {
+                    "reference_image": puzzle["reference_image"],  # Base64 data URL
+                    "option_images": puzzle["option_images"],  # Base64 data URLs
+                    "transform_steps": puzzle["transform_steps"],
+                    "answer": puzzle["answer"],
+                    "grid_size": puzzle["grid_size"]
+                }
+                
+                response_data = {
+                    'puzzle_type': puzzle_type,
+                    'image_path': None,
+                    'media_path': None,
+                    'media_type': None,
+                    'puzzle_id': puzzle_id,
+                    'prompt': puzzle["prompt"],
+                    'input_type': 'transform_pipeline_select',
+                    'debug_info': f"Type: {puzzle_type}, Generated puzzle: {puzzle_id}"
+                }
+                response_data.update(additional_data)
+                return jsonify(response_data)
+            except Exception as e:
+                # Fall back to ground truth if generation fails
+                print(f"Transform_Pipeline generation failed: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        # Use ground truth puzzles
+        reference_image = ground_truth[selected_puzzle].get("reference")
+        option_images = ground_truth[selected_puzzle].get("options", [])
+        transform_steps = ground_truth[selected_puzzle].get("transform_steps", [])
+        if not reference_image or not option_images:
+            return jsonify({'error': f'Invalid Transform_Pipeline data: {selected_puzzle}'}), 500
+
+        additional_data = {
+            "reference_image": f'/captcha_data/{puzzle_type}/{reference_image}',
+            "option_images": [f'/captcha_data/{puzzle_type}/{img}' for img in option_images],
+            "transform_steps": transform_steps,
+            "answer": ground_truth[selected_puzzle].get("answer"),
+            "grid_size": ground_truth[selected_puzzle].get("grid_size", [2, 3])
         }
     elif puzzle_type == "Spooky_Circle_Grid":
         option_gifs = ground_truth[selected_puzzle].get("options", [])
@@ -980,7 +1951,7 @@ def get_puzzle():
         prompt = ground_truth[selected_puzzle].get("prompt", "Solve the CAPTCHA puzzle")
 
     image_path = None
-    if puzzle_type not in ("Rotation_Match", "Shadow_Plausible", "Mirror",  "Squiggle", "Spooky_Circle_Grid", "Spooky_Circle_Grid_Direction", "Spooky_Shape_Grid", "Color_Cipher", "Color_Counting", "Trajectory_Recovery", "Storyboard_Logic", "Jigsaw_Puzzle"):
+    if puzzle_type not in ("Rotation_Match", "Shadow_Plausible", "Mirror",  "Squiggle", "Spooky_Circle_Grid", "Spooky_Circle_Grid_Direction", "Spooky_Shape_Grid", "Color_Cipher", "Color_Counting", "Trajectory_Recovery", "Storyboard_Logic", "Jigsaw_Puzzle", "Transform_Pipeline"):
         image_path = f'/captcha_data/{puzzle_type}/{selected_puzzle}'
         if not media_type:
             media_type = "image"
@@ -1049,7 +2020,7 @@ def check_answer():
     
     ground_truth = load_ground_truth(puzzle_type)
     
-    if puzzle_type not in ('Color_Cipher', 'Red_Dot', 'Spooky_Size', 'Jigsaw_Puzzle') and puzzle_id not in ground_truth:
+    if puzzle_type not in ('Color_Cipher', 'Red_Dot', 'Spooky_Size', 'Jigsaw_Puzzle', 'Transform_Pipeline') and puzzle_id not in ground_truth:
         return jsonify({'error': 'Invalid puzzle ID'}), 400
     
     # Get correct answer based on puzzle type
@@ -1111,6 +2082,29 @@ def check_answer():
             correct_answer_info = correct_index
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid answer format for Squiggle'}), 400
+    elif puzzle_type == 'Transform_Pipeline':
+        try:
+            # Check if this is a generated puzzle (stored in active_transform_pipeline_puzzles)
+            puzzle_state = active_transform_pipeline_puzzles.get(puzzle_id)
+            
+            if puzzle_state:
+                # Generated puzzle - use stored correct index
+                correct_index = puzzle_state.get('correct_index')
+            else:
+                # Ground truth puzzle
+                if puzzle_id not in ground_truth:
+                    return jsonify({'error': 'Invalid puzzle ID'}), 400
+                correct_index = int(ground_truth[puzzle_id].get('answer'))
+            
+            user_index = int(user_answer)
+            is_correct = user_index == correct_index
+            correct_answer_info = correct_index
+            
+            # Clean up generated puzzle state after validation
+            if puzzle_state:
+                active_transform_pipeline_puzzles.pop(puzzle_id, None)
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid answer format for Transform_Pipeline'}), 400
     elif puzzle_type == 'Spooky_Circle':
         try:
             correct_value = int(ground_truth[puzzle_id].get('answer'))
@@ -1448,7 +2442,10 @@ def check_answer():
             order_names = [f"Image {i+1}" for i in correct_answer_info]
             correct_payload = f"Correct order: {' → '.join(order_names)}"
         else:
-            correct_payload = ground_truth[puzzle_id].get(answer_key)
+            if puzzle_id in ground_truth:
+                correct_payload = ground_truth[puzzle_id].get(answer_key)
+            else:
+                correct_payload = str(correct_answer_info) if correct_answer_info is not None else "Unknown"
     elif puzzle_type == 'Jigsaw_Puzzle':
         # Format the correct positions as a readable string
         if isinstance(correct_answer_info, list):
@@ -1461,8 +2458,19 @@ def check_answer():
             correct_payload = f"Correct positions: {'; '.join(position_strs)}"
         else:
             correct_payload = "Puzzle completion details"
+    elif puzzle_type == 'Transform_Pipeline':
+        # Format the correct answer index
+        if isinstance(correct_answer_info, int):
+            correct_payload = f"Option {correct_answer_info + 1} (index {correct_answer_info})"
+        else:
+            correct_payload = f"Correct answer: {correct_answer_info}"
     else:
-        correct_payload = ground_truth[puzzle_id].get(answer_key)
+        # Only access ground_truth if puzzle_id exists in it (not generated puzzles)
+        if puzzle_id in ground_truth:
+            correct_payload = ground_truth[puzzle_id].get(answer_key)
+        else:
+            # Fallback for generated puzzles not in ground_truth
+            correct_payload = str(correct_answer_info) if correct_answer_info is not None else "Unknown"
 
     response_body = {
         'correct': is_correct,
