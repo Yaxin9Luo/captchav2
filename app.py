@@ -910,15 +910,16 @@ def generate_transform_pipeline(config: dict) -> dict:
     # New template initializers and renderers
     def circle_init():
         if use_random_initial_state:
-            radius = random.randint(60, 100)
-            center_x = random.randint(100, 156)
-            center_y = random.randint(100, 156)
+            radius = random.randint(50, 80)
+            # Make positions more offset from center for more obvious shifts
+            center_x = random.choice([random.randint(60, 90), random.randint(166, 196)])  # Left or right side
+            center_y = random.choice([random.randint(60, 90), random.randint(166, 196)])  # Top or bottom
             fill = random.choice(COLOR_POOL)
             bg = random.choice(["white", "black"])
         else:
-            radius = 80
-            center_x = 128
-            center_y = 128
+            radius = 70
+            center_x = 90  # Offset to left
+            center_y = 90  # Offset to top
             fill = "blue"
             bg = "white"
         return {"type": "circle", "center_x": center_x, "center_y": center_y, "radius": radius, "fill": fill, "bg": bg}
@@ -929,12 +930,14 @@ def generate_transform_pipeline(config: dict) -> dict:
             # For circle, rotation doesn't change appearance, but we can swap center for effect
             deg = arg if arg >= 0 else (360+arg)
             if deg == 180:
-                # Flip position
+                # Flip position - make shift more obvious
                 s["center_x"] = 256 - s["center_x"]
                 s["center_y"] = 256 - s["center_y"]
         elif op == "mirror_h":
+            # Horizontal mirror - flip across vertical center (128)
             s["center_x"] = 256 - s["center_x"]
         elif op == "mirror_v":
+            # Vertical mirror - flip across horizontal center (128)
             s["center_y"] = 256 - s["center_y"]
         elif op == "map_colors":
             s["fill"] = arg.get(s["fill"], s["fill"])
@@ -946,16 +949,17 @@ def generate_transform_pipeline(config: dict) -> dict:
     
     def square_init():
         if use_random_initial_state:
-            size = random.randint(80, 140)
-            center_x = random.randint(100, 156)
-            center_y = random.randint(100, 156)
+            size = random.randint(70, 110)
+            # Make positions more offset from center for more obvious shifts
+            center_x = random.choice([random.randint(60, 90), random.randint(166, 196)])  # Left or right side
+            center_y = random.choice([random.randint(60, 90), random.randint(166, 196)])  # Top or bottom
             rotation = random.choice([0, 45, 90, 135])
             fill = random.choice(COLOR_POOL)
             bg = random.choice(["white", "black"])
         else:
-            size = 120
-            center_x = 128
-            center_y = 128
+            size = 100
+            center_x = 90  # Offset to left
+            center_y = 90  # Offset to top
             rotation = 0
             fill = "green"
             bg = "white"
@@ -968,9 +972,11 @@ def generate_transform_pipeline(config: dict) -> dict:
             s["rotation"] = (s["rotation"] + deg) % 360
         elif op == "mirror_h":
             s["rotation"] = (360 - s["rotation"]) % 360
+            # Horizontal mirror - flip across vertical center (128)
             s["center_x"] = 256 - s["center_x"]
         elif op == "mirror_v":
             s["rotation"] = (180 - s["rotation"]) % 360
+            # Vertical mirror - flip across horizontal center (128)
             s["center_y"] = 256 - s["center_y"]
         elif op == "map_colors":
             s["fill"] = arg.get(s["fill"], s["fill"])
@@ -982,16 +988,17 @@ def generate_transform_pipeline(config: dict) -> dict:
     
     def triangle_init():
         if use_random_initial_state:
-            size = random.randint(70, 120)
-            center_x = random.randint(100, 156)
-            center_y = random.randint(100, 156)
+            size = random.randint(60, 100)
+            # Make positions more offset from center for more obvious shifts
+            center_x = random.choice([random.randint(60, 90), random.randint(166, 196)])  # Left or right side
+            center_y = random.choice([random.randint(60, 90), random.randint(166, 196)])  # Top or bottom
             orientation = random.choice(["up", "down", "left", "right"])
             fill = random.choice(COLOR_POOL)
             bg = random.choice(["white", "black"])
         else:
-            size = 100
-            center_x = 128
-            center_y = 128
+            size = 90
+            center_x = 90  # Offset to left
+            center_y = 90  # Offset to top
             orientation = "up"
             fill = "purple"
             bg = "white"
@@ -1007,9 +1014,11 @@ def generate_transform_pipeline(config: dict) -> dict:
             s["orientation"] = orient_order[(idx + steps) % 4]
         elif op == "mirror_h":
             s["orientation"] = {"up": "up", "down": "down", "left": "right", "right": "left"}[s["orientation"]]
+            # Horizontal mirror - flip across vertical center (128)
             s["center_x"] = 256 - s["center_x"]
         elif op == "mirror_v":
             s["orientation"] = {"left": "left", "right": "right", "up": "down", "down": "up"}[s["orientation"]]
+            # Vertical mirror - flip across horizontal center (128)
             s["center_y"] = 256 - s["center_y"]
         elif op == "map_colors":
             s["fill"] = arg.get(s["fill"], s["fill"])
@@ -1021,18 +1030,19 @@ def generate_transform_pipeline(config: dict) -> dict:
     
     def star_init():
         if use_random_initial_state:
-            outer_radius = random.randint(60, 85)
-            inner_radius = random.randint(25, outer_radius // 2)
-            center_x = random.randint(100, 156)
-            center_y = random.randint(100, 156)
+            outer_radius = random.randint(50, 75)
+            inner_radius = random.randint(20, outer_radius // 2)
+            # Make positions more offset from center for more obvious shifts
+            center_x = random.choice([random.randint(60, 90), random.randint(166, 196)])  # Left or right side
+            center_y = random.choice([random.randint(60, 90), random.randint(166, 196)])  # Top or bottom
             rotation = random.randint(0, 359)
             fill = random.choice(COLOR_POOL)
             bg = random.choice(["white", "black"])
         else:
-            outer_radius = 70
-            inner_radius = 35
-            center_x = 128
-            center_y = 128
+            outer_radius = 65
+            inner_radius = 32
+            center_x = 90  # Offset to left
+            center_y = 90  # Offset to top
             rotation = 0
             fill = "orange"
             bg = "white"
@@ -1045,9 +1055,11 @@ def generate_transform_pipeline(config: dict) -> dict:
             s["rotation"] = (s["rotation"] + deg) % 360
         elif op == "mirror_h":
             s["rotation"] = (360 - s["rotation"]) % 360
+            # Horizontal mirror - flip across vertical center (128)
             s["center_x"] = 256 - s["center_x"]
         elif op == "mirror_v":
             s["rotation"] = (180 - s["rotation"]) % 360
+            # Vertical mirror - flip across horizontal center (128)
             s["center_y"] = 256 - s["center_y"]
         elif op == "map_colors":
             s["fill"] = arg.get(s["fill"], s["fill"])
@@ -1059,18 +1071,19 @@ def generate_transform_pipeline(config: dict) -> dict:
     
     def diamond_init():
         if use_random_initial_state:
-            width = random.randint(80, 130)
-            height = random.randint(80, 130)
-            center_x = random.randint(100, 156)
-            center_y = random.randint(100, 156)
+            width = random.randint(70, 110)
+            height = random.randint(70, 110)
+            # Make positions more offset from center for more obvious shifts
+            center_x = random.choice([random.randint(60, 90), random.randint(166, 196)])  # Left or right side
+            center_y = random.choice([random.randint(60, 90), random.randint(166, 196)])  # Top or bottom
             rotation = random.choice([0, 45, 90, 135])
             fill = random.choice(COLOR_POOL)
             bg = random.choice(["white", "black"])
         else:
-            width = 100
-            height = 100
-            center_x = 128
-            center_y = 128
+            width = 90
+            height = 90
+            center_x = 90  # Offset to left
+            center_y = 90  # Offset to top
             rotation = 0
             fill = "pink"
             bg = "white"
@@ -1083,9 +1096,11 @@ def generate_transform_pipeline(config: dict) -> dict:
             s["rotation"] = (s["rotation"] + deg) % 360
         elif op == "mirror_h":
             s["rotation"] = (360 - s["rotation"]) % 360
+            # Horizontal mirror - flip across vertical center (128)
             s["center_x"] = 256 - s["center_x"]
         elif op == "mirror_v":
             s["rotation"] = (180 - s["rotation"]) % 360
+            # Vertical mirror - flip across horizontal center (128)
             s["center_y"] = 256 - s["center_y"]
         elif op == "map_colors":
             s["fill"] = arg.get(s["fill"], s["fill"])
