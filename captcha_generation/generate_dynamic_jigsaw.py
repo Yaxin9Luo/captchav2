@@ -315,4 +315,4 @@ def generate_dynamic_jigsaw_dataset(output_dir, num_puzzles=10, grid_rows=3, gri
 
 if __name__ == "__main__":
     output_dir = "../captcha_data/Dynamic_Jigsaw"
-    generate_dynamic_jigsaw_dataset(output_dir, num_puzzles=10, grid_rows=3, grid_cols=3)
+    generate_dynamic_jigsaw_dataset(output_dir, num_puzzles=20, grid_rows=3, grid_cols=3)

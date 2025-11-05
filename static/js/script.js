@@ -1013,23 +1013,28 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         jigsawSubmitBtn.addEventListener('click', () => {
-            // Allow submission even if pieces aren't placed - backend will mark as incorrect
+            // For Dynamic_Jigsaw and Spooky_Jigsaw, require at least one piece to be placed
+            if ((data.puzzle_type === 'Dynamic_Jigsaw' || data.puzzle_type === 'Spooky_Jigsaw') && jigsawPlacements.length === 0) {
+                alert('Please place at least one puzzle piece before submitting.');
+                return;
+            }
+
             // Validate that all placements have valid coordinates (if any pieces are placed)
-            const invalidPlacements = jigsawPlacements.filter(p => 
-                p.piece_index === undefined || 
-                p.grid_row === undefined || 
+            const invalidPlacements = jigsawPlacements.filter(p =>
+                p.piece_index === undefined ||
+                p.grid_row === undefined ||
                 p.grid_col === undefined ||
                 isNaN(p.piece_index) ||
                 isNaN(p.grid_row) ||
                 isNaN(p.grid_col)
             );
-            
+
             // If there are placements but they're invalid, warn but allow submission
             if (invalidPlacements.length > 0 && jigsawPlacements.length > 0) {
                 console.error('Invalid placements detected:', invalidPlacements);
                 // Still allow submission - backend will handle validation
             }
-            
+
             jigsawSubmitBtn.disabled = true;
             jigsawSubmitBtn.textContent = 'Processing...';
             submitAnswer();

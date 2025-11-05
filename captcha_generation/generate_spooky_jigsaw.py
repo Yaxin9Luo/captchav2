@@ -480,7 +480,7 @@ def generate_spooky_jigsaw_dataset(output_dir, num_puzzles=10, grid_rows=3, grid
 
 if __name__ == "__main__":
     output_dir = "../captcha_data/Spooky_Jigsaw"
-    generate_spooky_jigsaw_dataset(output_dir, num_puzzles=10, grid_rows=3, grid_cols=3)
+    generate_spooky_jigsaw_dataset(output_dir, num_puzzles=20, grid_rows=3, grid_cols=3)
 
     print("\n" + "="*70)
     print("🎯 Spooky Jigsaw CAPTCHA Dataset Generated!")
