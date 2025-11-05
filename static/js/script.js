@@ -116,6 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
             '.color-cipher-question',
             '.red-dot-area',
             '.trajectory-gif-container',
+            '.set-game-rules-container',
             '.storyboard-logic-container',
             '.jigsaw-puzzle-container'
         ];
@@ -1483,6 +1484,44 @@ document.addEventListener('DOMContentLoaded', () => {
 
             gifContainer.appendChild(gifImg);
             puzzleImageContainer.appendChild(gifContainer);
+        }
+
+        // For Set_Game, show rules explanation above the grid
+        if (data.puzzle_type === 'Set_Game') {
+            const rulesContainer = document.createElement('div');
+            rulesContainer.className = 'set-game-rules-container';
+            rulesContainer.style.backgroundColor = '#f5f5f5';
+            rulesContainer.style.border = '2px solid #333';
+            rulesContainer.style.borderRadius = '8px';
+            rulesContainer.style.padding = '15px';
+            rulesContainer.style.marginBottom = '20px';
+            rulesContainer.style.textAlign = 'left';
+
+            const rulesTitle = document.createElement('h3');
+            rulesTitle.textContent = 'Set Game Rules:';
+            rulesTitle.style.marginTop = '0';
+            rulesTitle.style.marginBottom = '10px';
+            rulesTitle.style.fontSize = '18px';
+            rulesTitle.style.fontWeight = 'bold';
+
+            const rulesText = document.createElement('div');
+            rulesText.innerHTML = `
+                <p style="margin: 5px 0;"><strong>Each card has 4 attributes:</strong></p>
+                <ul style="margin: 5px 0 5px 20px; padding: 0;">
+                    <li><strong>Shape:</strong> circle, square, or triangle</li>
+                    <li><strong>Color:</strong> red, green, or blue</li>
+                    <li><strong>Count:</strong> 1, 2, or 3 shapes per card</li>
+                    <li><strong>Fill:</strong> solid (filled), striped (lines), or empty (outline only)</li>
+                </ul>
+                <p style="margin: 5px 0;"><strong>How to find a valid Set:</strong> For each attribute, the 3 cards must be either <em>all the same</em> or <em>all different</em>.</p>
+                <p style="margin: 5px 0; font-style: italic;">Select exactly 3 cards that match the condition shown in the prompt below.</p>
+            `;
+            rulesText.style.fontSize = '14px';
+            rulesText.style.lineHeight = '1.5';
+
+            rulesContainer.appendChild(rulesTitle);
+            rulesContainer.appendChild(rulesText);
+            puzzleImageContainer.appendChild(rulesContainer);
         }
 
         const gridContainer = document.createElement('div');
