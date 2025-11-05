@@ -90,12 +90,6 @@ def create_moving_shapes_gif(width=450, height=450, num_frames=30, grid_rows=3, 
         img = Image.new('RGB', (width, height), 'white')
         draw = ImageDraw.Draw(img)
 
-        # Draw background pattern
-        for i in range(0, width, 20):
-            draw.line([(i, 0), (i, height)], fill=(240, 240, 240), width=1)
-        for i in range(0, height, 20):
-            draw.line([(0, i), (width, i)], fill=(240, 240, 240), width=1)
-
         # Update and draw each shape
         for shape in shapes:
             # Update position
