@@ -32,6 +32,7 @@ def _build_task_prompt(url: str, limit: int) -> str:
 
 	CRITICAL MEMORY INSTRUCTION:
 	- Treat EACH puzzle as COMPLETELY NEW and INDEPENDENT.
+	- Never refresh the page!!!
 	- DO NOT rely on information, patterns, or assumptions from previous puzzles.
 	- DO NOT assume the current puzzle is similar to the previous one.
 	- When a new puzzle loads, CLEAR your mental state and approach it fresh.

@@ -290,9 +290,6 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'transform_pipeline_select':
                 setupTransformPipelineSelect(data);
                 break;
-            case 'map_parity':
-                setupMapParity(data);
-                break;
             case 'circle_grid_select':
             case 'circle_grid_direction_select':
             case 'shape_grid_select':
@@ -1844,37 +1841,6 @@ document.addEventListener('DOMContentLoaded', () => {
         optionElement.classList.add('active');
     }
 
-    function setupMapParity(data) {
-        if (inputGroup) {
-            inputGroup.style.display = 'flex';
-        }
-
-        submitBtn.style.display = 'block';
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Submit';
-
-        userAnswerInput.type = 'text';
-        userAnswerInput.value = '';
-        userAnswerInput.placeholder = 'Enter parity (odd or even)';
-
-        // Render SVG media
-        const mediaPath = data.media_path || data.image_path;
-        if (mediaPath) {
-            // Clear container first
-            puzzleImageContainer.innerHTML = '';
-            
-            // Create img element for SVG (SVG data URLs work with img tags)
-            const svgImg = document.createElement('img');
-            svgImg.src = mediaPath;
-            svgImg.alt = data.prompt || 'Map Parity Puzzle';
-            svgImg.style.display = 'block';
-            svgImg.style.maxWidth = '100%';
-            svgImg.style.height = 'auto';
-            svgImg.style.margin = '0 auto';
-            puzzleImageContainer.appendChild(svgImg);
-        }
-    }
-
     function setupColorCipher(data) {
         const revealDuration = Number.parseInt(data.reveal_duration, 10);
         const revealSeconds = Number.isFinite(revealDuration) && revealDuration > 0 ? revealDuration : 3;
@@ -2053,14 +2019,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
                 break;
-            case 'map_parity':
-                if (!userAnswerInput.value.trim()) {
-                    showError('Enter your answer (odd or even) before submitting.');
-                    resetCustomSubmitButtons();
-                    return;
-                }
-                answerData.answer = userAnswerInput.value.trim();
-                break;
             case 'color_cipher':
                 if (!userAnswerInput.value.trim()) {
                     showError('Enter your answer before submitting.');
@@ -2138,8 +2096,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     resultMessage.className = 'result-message correct';
                     createFireworks();
                 } else {
-                    const errorMsg = data.correct_answer ? `Incorrect. ${data.correct_answer}` : 'Incorrect.';
-                    resultMessage.textContent = errorMsg;
+                    resultMessage.textContent = 'Incorrect. Try again.';
                     resultMessage.className = 'result-message incorrect';
                     createSadFace();
                 }

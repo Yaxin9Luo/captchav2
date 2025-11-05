@@ -13,16 +13,6 @@ try:
 except ImportError:
     PIL_AVAILABLE = False
 
-# Import Map_Parity generation functions
-try:
-    import sys
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'captcha_data', 'Map_Parity'))
-    from service import make_puzzle, svg_board, generate_items
-    MAP_PARITY_AVAILABLE = True
-except Exception as e:
-    print(f"Warning: Map_Parity service not available: {e}")
-    MAP_PARITY_AVAILABLE = False
-
 app = Flask(__name__, static_folder='static', template_folder='templates')
 
 # Dictionary to track which puzzles have been shown for each CAPTCHA type
@@ -33,23 +23,22 @@ recent_types = []
 MAX_RECENT_TYPES = 5
 
 PUZZLE_TYPE_SEQUENCE = [
-    # 'Dice_Count',
-    # 'Shadow_Plausible',
-    # 'Mirror',
-    # 'Squiggle',
-    # 'Color_Cipher',
-    # 'Color_Counting',
-    # 'Trajectory_Recovery',
-    # 'Spooky_Size',
-    # 'Spooky_Circle',
-    # 'Spooky_Circle_Grid',
-    # 'Spooky_Shape_Grid',
-    # 'Spooky_Text',
-    # 'Red_Dot',
-    # 'Storyboard_Logic',
-    # 'Jigsaw_Puzzle',
-    # 'Transform_Pipeline',
-    'Map_Parity',
+    'Dice_Count',
+    'Shadow_Plausible',
+    'Mirror',
+    'Squiggle',
+    'Color_Cipher',
+    'Color_Counting',
+    'Trajectory_Recovery',
+    'Spooky_Size',
+    'Spooky_Circle',
+    'Spooky_Circle_Grid',
+    'Spooky_Shape_Grid',
+    'Spooky_Text',
+    'Red_Dot',
+    'Storyboard_Logic',
+    'Jigsaw_Puzzle',
+    'Transform_Pipeline',
 ]
 sequential_index = 0
 
@@ -57,7 +46,6 @@ active_red_dot_puzzles: dict[str, dict] = {}
 active_spooky_size_puzzles: dict[str, dict] = {}
 active_jigsaw_puzzles: dict[str, dict] = {}
 active_transform_pipeline_puzzles: dict[str, dict] = {}
-active_map_parity_puzzles: dict[str, dict] = {}
 
 COLOR_SYMBOL_POOL = [
     ("🟥", "red"),
@@ -1596,79 +1584,6 @@ def get_puzzle():
         }
         return jsonify(response_data)
 
-    if puzzle_type == "Map_Parity":
-        if not MAP_PARITY_AVAILABLE:
-            return jsonify({'error': 'Map_Parity service not available'}), 500
-        
-        config = ground_truth.get("config", {})
-        
-        # Generate puzzle using config parameters
-        R_choices = config.get("rows", [5, 6, 7])
-        C_choices = config.get("cols", [5, 6, 7])
-        p_block_range = tuple(config.get("p_block_range", [0.08, 0.18]))
-        oneway_ratio_range = tuple(config.get("oneway_ratio_range", [0.10, 0.30]))
-        tp_pair_weights_raw = config.get("tp_pair_weights", {"0": 0.35, "1": 0.5, "2": 0.15})
-        tp_pair_weights = {int(k): float(v) for k, v in tp_pair_weights_raw.items()}
-        if not tp_pair_weights:
-            tp_pair_weights = {0: 0.35, 1: 0.5, 2: 0.15}
-        min_steps = config.get("min_steps", 3)
-        max_steps = config.get("max_steps", 40)
-        no_text = config.get("no_text", False)
-        seed = config.get("seed", None)
-        
-        # Generate puzzle
-        if seed is not None:
-            random.seed(seed)
-        
-        puzzle = None
-        max_attempts = 50
-        for _ in range(max_attempts):
-            puzzle = make_puzzle(
-                R_choices=R_choices,
-                C_choices=C_choices,
-                p_block_range=p_block_range,
-                oneway_ratio_range=oneway_ratio_range,
-                tp_pair_weights=tp_pair_weights,
-                min_steps=min_steps,
-                max_steps=max_steps,
-            )
-            if puzzle:
-                break
-        
-        if not puzzle:
-            return jsonify({'error': 'Failed to generate Map_Parity puzzle'}), 500
-        
-        # Generate SVG
-        svg_content = svg_board(puzzle, no_text=no_text)
-        
-        # Convert SVG to data URL
-        svg_data_url = f"data:image/svg+xml;base64,{base64.b64encode(svg_content.encode('utf-8')).decode('utf-8')}"
-        
-        # Generate unique puzzle ID
-        puzzle_id = f"map_parity_{int(time.time()*1000)}_{random.randint(1000,9999)}"
-        
-        # Store puzzle state for validation
-        active_map_parity_puzzles[puzzle_id] = {
-            "shortest_parity": puzzle["shortest_parity"],
-            "shortest_len": puzzle["shortest_len"],
-            "manhattan_parity": puzzle["manhattan_parity"],
-            "manhattan": puzzle["manhattan"]
-        }
-        
-        prompt = config.get("prompt", "Find the shortest path from S (green diamond) to T (red diamond). What is the parity (odd or even) of the shortest path length?")
-        
-        response_data = {
-            'puzzle_type': puzzle_type,
-            'image_path': None,
-            'media_path': svg_data_url,
-            'media_type': 'svg',
-            'puzzle_id': puzzle_id,
-            'prompt': prompt,
-            'input_type': 'map_parity',
-            'debug_info': f"Type: {puzzle_type}, Puzzle: {puzzle_id}, Shortest length: {puzzle['shortest_len']}, Parity: {puzzle['shortest_parity']}"
-        }
-        return jsonify(response_data)
-
     if puzzle_type == "Spooky_Size":
         if not ground_truth:
             return jsonify({'error': f'No puzzles found for type: {puzzle_type}'}), 404
@@ -1831,8 +1746,6 @@ def get_puzzle():
         input_type = "jigsaw_puzzle"
     elif puzzle_type == "Transform_Pipeline":
         input_type = "transform_pipeline_select"
-    elif puzzle_type == "Map_Parity":
-        input_type = "map_parity"
     
     # For Rotation_Match, include additional data needed for the interface
     additional_data = {}
@@ -2053,7 +1966,7 @@ def get_puzzle():
         prompt = ground_truth[selected_puzzle].get("prompt", "Solve the CAPTCHA puzzle")
 
     image_path = None
-    if puzzle_type not in ("Rotation_Match", "Shadow_Plausible", "Mirror",  "Squiggle", "Spooky_Circle_Grid", "Spooky_Circle_Grid_Direction", "Spooky_Shape_Grid", "Color_Cipher", "Color_Counting", "Trajectory_Recovery", "Storyboard_Logic", "Jigsaw_Puzzle", "Transform_Pipeline", "Map_Parity"):
+    if puzzle_type not in ("Rotation_Match", "Shadow_Plausible", "Mirror",  "Squiggle", "Spooky_Circle_Grid", "Spooky_Circle_Grid_Direction", "Spooky_Shape_Grid", "Color_Cipher", "Color_Counting", "Trajectory_Recovery", "Storyboard_Logic", "Jigsaw_Puzzle", "Transform_Pipeline"):
         image_path = f'/captcha_data/{puzzle_type}/{selected_puzzle}'
         if not media_type:
             media_type = "image"
@@ -2122,7 +2035,7 @@ def check_answer():
     
     ground_truth = load_ground_truth(puzzle_type)
     
-    if puzzle_type not in ('Color_Cipher', 'Red_Dot', 'Spooky_Size', 'Jigsaw_Puzzle', 'Transform_Pipeline', 'Map_Parity') and puzzle_id not in ground_truth:
+    if puzzle_type not in ('Color_Cipher', 'Red_Dot', 'Spooky_Size', 'Jigsaw_Puzzle', 'Transform_Pipeline') and puzzle_id not in ground_truth:
         return jsonify({'error': 'Invalid puzzle ID'}), 400
     
     # Get correct answer based on puzzle type
@@ -2509,29 +2422,6 @@ def check_answer():
             correct_answer_info = correct_value
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid answer format for Color_Cipher'}), 400
-    elif puzzle_type == 'Map_Parity':
-        # Check if this is a generated puzzle (stored in active_map_parity_puzzles)
-        puzzle_state = active_map_parity_puzzles.get(puzzle_id)
-        
-        if puzzle_state:
-            # Generated puzzle - use stored correct parity
-            correct_parity = puzzle_state.get('shortest_parity')
-        else:
-            return jsonify({'error': 'Invalid puzzle ID or puzzle expired'}), 400
-        
-        # Normalize user answer (accept "odd", "even", or "o", "e")
-        user_answer_normalized = str(user_answer).strip().lower()
-        if user_answer_normalized in ['o', 'odd']:
-            user_answer_normalized = 'odd'
-        elif user_answer_normalized in ['e', 'even']:
-            user_answer_normalized = 'even'
-        
-        is_correct = user_answer_normalized == correct_parity.lower()
-        correct_answer_info = correct_parity
-        
-        # Clean up puzzle state after validation
-        if puzzle_state:
-            active_map_parity_puzzles.pop(puzzle_id, None)
     else:
         # For other types, compare as strings (case insensitive)
         correct_answer = ground_truth[puzzle_id].get('answer')
@@ -2589,9 +2479,6 @@ def check_answer():
             correct_payload = f"Option {correct_answer_info + 1} (index {correct_answer_info})"
         else:
             correct_payload = f"Correct answer: {correct_answer_info}"
-    elif puzzle_type == 'Map_Parity':
-        # Format the correct parity answer
-        correct_payload = f"Parity: {correct_answer_info}"
     else:
         # Only access ground_truth if puzzle_id exists in it (not generated puzzles)
         if puzzle_id in ground_truth:
