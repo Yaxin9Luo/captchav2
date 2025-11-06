@@ -29,6 +29,8 @@ PUZZLE_TYPE_SEQUENCE = [
     # 'Squiggle',
     # 'Color_Cipher',
     # 'Color_Counting',
+    'Hole_Counting',
+    'Rotation_Match',
     # 'Trajectory_Recovery',
     # 'Spooky_Size',
     # 'Spooky_Circle',
@@ -41,7 +43,7 @@ PUZZLE_TYPE_SEQUENCE = [
     # 'Transform_Pipeline',
     # 'Set_Game',
     # 'Dynamic_Jigsaw',
-    'Spooky_Jigsaw',
+    # 'Spooky_Jigsaw',
 ]
 sequential_index = 0
 
@@ -1735,6 +1737,10 @@ def get_puzzle():
         input_type = "circle_grid_direction_select"
     elif puzzle_type == "Spooky_Shape_Grid":
         input_type = "shape_grid_select"
+    elif puzzle_type == "Hole_Counting":
+        input_type = "hole_counting_select"
+    elif puzzle_type == "Rotation_Match":
+        input_type = "rotation_match_select"
     elif puzzle_type == "Spooky_Text":
         input_type = "text"
     elif puzzle_type == "Color_Cipher":
@@ -1885,8 +1891,52 @@ def get_puzzle():
             "option_images": [f'/captcha_data/{puzzle_type}/{gif}' for gif in option_gifs],
             "grid_size": ground_truth[selected_puzzle].get("grid_size", [3, 3]),
             "answer": ground_truth[selected_puzzle].get("answer", []),
-            "target_shape": ground_truth[selected_puzzle].get("target_shape"),
-            "target_direction": ground_truth[selected_puzzle].get("target_direction")
+        }
+    elif puzzle_type == "Hole_Counting":
+        # Load cell pool to map cell IDs to filenames
+        cell_pool_path = os.path.join('captcha_data', puzzle_type, 'cell_pool.json')
+        with open(cell_pool_path) as f:
+            cell_pool = json.load(f)
+
+        cell_ids = ground_truth[selected_puzzle].get("cells", [])
+        if not cell_ids:
+            return jsonify({'error': f'Invalid Hole_Counting data: {selected_puzzle}'}), 500
+
+        # Convert cell IDs to image paths
+        cell_images = []
+        for cell_id in cell_ids:
+            if cell_id in cell_pool:
+                cell_images.append(f'/captcha_data/{puzzle_type}/{cell_pool[cell_id]["filename"]}')
+            else:
+                return jsonify({'error': f'Cell not found in pool: {cell_id}'}), 500
+
+        additional_data = {
+            "option_images": cell_images,
+            "grid_size": ground_truth[selected_puzzle].get("grid_size", [4, 4]),
+            "answer": ground_truth[selected_puzzle].get("answer", [])
+        }
+    elif puzzle_type == "Rotation_Match":
+        # Load cell pool to map cell IDs to filenames
+        cell_pool_path = os.path.join('captcha_data', puzzle_type, 'cell_pool.json')
+        with open(cell_pool_path) as f:
+            cell_pool = json.load(f)
+
+        cell_ids = ground_truth[selected_puzzle].get("cells", [])
+        if not cell_ids:
+            return jsonify({'error': f'Invalid Rotation_Match data: {selected_puzzle}'}), 500
+
+        # Convert cell IDs to image paths
+        cell_images = []
+        for cell_id in cell_ids:
+            if cell_id in cell_pool:
+                cell_images.append(f'/captcha_data/{puzzle_type}/{cell_pool[cell_id]["filename"]}')
+            else:
+                return jsonify({'error': f'Cell not found in pool: {cell_id}'}), 500
+
+        additional_data = {
+            "option_images": cell_images,
+            "grid_size": ground_truth[selected_puzzle].get("grid_size", [4, 4]),
+            "answer": ground_truth[selected_puzzle].get("answer", [])
         }
     elif puzzle_type == "Color_Counting":
         option_images = ground_truth[selected_puzzle].get("options", [])
@@ -2022,7 +2072,7 @@ def get_puzzle():
         prompt = ground_truth[selected_puzzle].get("prompt", "Solve the CAPTCHA puzzle")
 
     image_path = None
-    if puzzle_type not in ("Rotation_Match", "Shadow_Plausible", "Mirror",  "Squiggle", "Spooky_Circle_Grid", "Spooky_Circle_Grid_Direction", "Spooky_Shape_Grid", "Color_Cipher", "Color_Counting", "Trajectory_Recovery", "Storyboard_Logic", "Jigsaw_Puzzle", "Transform_Pipeline", "Set_Game", "Dynamic_Jigsaw", "Spooky_Jigsaw"):
+    if puzzle_type not in ("Rotation_Match", "Shadow_Plausible", "Mirror",  "Squiggle", "Spooky_Circle_Grid", "Spooky_Circle_Grid_Direction", "Spooky_Shape_Grid", "Color_Cipher", "Color_Counting", "Hole_Counting", "Trajectory_Recovery", "Storyboard_Logic", "Jigsaw_Puzzle", "Transform_Pipeline", "Set_Game", "Dynamic_Jigsaw", "Spooky_Jigsaw"):
         image_path = f'/captcha_data/{puzzle_type}/{selected_puzzle}'
         if not media_type:
             media_type = "image"
@@ -2216,6 +2266,22 @@ def check_answer():
             correct_answer_info = correct_indices
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid answer format for Color_Counting'}), 400
+    elif puzzle_type == 'Hole_Counting':
+        try:
+            correct_indices = sorted(ground_truth[puzzle_id].get('answer', []))
+            user_indices = sorted(int(idx) for idx in user_answer)
+            is_correct = user_indices == correct_indices
+            correct_answer_info = correct_indices
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid answer format for Hole_Counting'}), 400
+    elif puzzle_type == 'Rotation_Match':
+        try:
+            correct_indices = sorted(ground_truth[puzzle_id].get('answer', []))
+            user_indices = sorted(int(idx) for idx in user_answer)
+            is_correct = user_indices == correct_indices
+            correct_answer_info = correct_indices
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid answer format for Rotation_Match'}), 400
     elif puzzle_type == 'Trajectory_Recovery':
         try:
             correct_indices = sorted(ground_truth[puzzle_id].get('answer', []))

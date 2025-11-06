@@ -20,10 +20,14 @@ document.addEventListener('DOMContentLoaded', () => {
     let mirrorSelectedCells = [];
     let squiggleSelectedIndex = null;
     let transformPipelineSelectedIndex = null;
-    let spookyGridSelectedCells = [];
+    let selectedGridCells = [];
     let storyboardOrder = [];
     let storyboardSelectedIndices = [];
     let jigsawPlacements = [];
+
+    // Expose jigsawPlacements globally so agents can programmatically update it
+    window.jigsawPlacements = jigsawPlacements;
+
     let squiggleRevealTimeout = null;
     let colorCipherRevealTimeout = null;
     let redDotTimeout = null;
@@ -33,6 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let redDotTimeoutDuration = 2000;
     let redDotElement = null;
     let spookySizeAnswered = false;
+    let spookySizeClickAnswer = null;
 
     submitBtn.addEventListener('click', submitAnswer);
     userAnswerInput.addEventListener('keypress', (event) => {
@@ -53,6 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
         storyboardOrder = [];
         storyboardSelectedIndices = [];
         jigsawPlacements = [];
+        window.jigsawPlacements = jigsawPlacements;
         if (squiggleRevealTimeout) {
             clearTimeout(squiggleRevealTimeout);
             squiggleRevealTimeout = null;
@@ -295,9 +301,11 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'circle_grid_direction_select':
             case 'shape_grid_select':
             case 'color_counting_select':
+            case 'hole_counting_select':
+            case 'rotation_match_select':
             case 'trajectory_recovery_select':
             case 'set_game_select':
-                setupSpookyGridSelect(data);
+                setupGridSelection(data);
                 break;
             default:
                 configureTextPuzzle(data);
@@ -457,67 +465,14 @@ document.addEventListener('DOMContentLoaded', () => {
             clickArea.style.pointerEvents = 'none';
             spookySizeAnswered = true;
 
-            // Submit answer
-            const answerData = {
-                puzzle_type: currentPuzzle.puzzle_type,
-                puzzle_id: currentPuzzle.puzzle_id,
-                answer: {
-                    position: {
-                        x: Number(clickX.toFixed(2)),
-                        y: Number(clickY.toFixed(2))
-                    }
+            // Store answer and submit using shared function
+            spookySizeClickAnswer = {
+                position: {
+                    x: Number(clickX.toFixed(2)),
+                    y: Number(clickY.toFixed(2))
                 }
             };
-            answerData.elapsed_time = ((Date.now() - (puzzleStartTime || Date.now())) / 1000).toFixed(2);
-
-            fetch('/api/check_answer', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(answerData)
-            })
-            .then(response => {
-                if (!response.ok) {
-                    return response.json().then(err => {
-                        throw new Error(err.error || `HTTP error! status: ${response.status}`);
-                    });
-                }
-                return response.json();
-            })
-            .then(result => {
-                if (result.error) {
-                    throw new Error(result.error);
-                }
-
-                benchmarkStats.total += 1;
-
-                if (result.correct) {
-                    benchmarkStats.correct += 1;
-                    resultMessage.textContent = 'Correct! You clicked the right shape.';
-                    resultMessage.className = 'result-message correct';
-                    createFireworks();
-                } else {
-                    resultMessage.textContent = 'Incorrect. Try the next puzzle.';
-                    resultMessage.className = 'result-message incorrect';
-                    createSadFace();
-                }
-
-                updateStats();
-                recordBenchmarkResult({
-                    puzzle_type: currentPuzzle.puzzle_type,
-                    puzzle_id: currentPuzzle.puzzle_id,
-                    user_answer: answerData.answer,
-                    correct_answer: result.correct_answer,
-                    correct: result.correct,
-                    elapsed_time: answerData.elapsed_time
-                });
-
-                setTimeout(() => loadNewPuzzle(), 2000);
-            })
-            .catch(error => {
-                console.error('Error submitting answer:', error);
-                resultMessage.textContent = `Error: ${error.message || 'Error submitting answer.'}`;
-                resultMessage.className = 'result-message incorrect';
-            });
+            submitAnswer();
         });
 
         puzzleImageContainer.appendChild(clickArea);
@@ -728,6 +683,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Initialize placements - all pieces start unplaced
         jigsawPlacements = [];
+        window.jigsawPlacements = jigsawPlacements;
 
         const container = document.createElement('div');
         container.className = 'jigsaw-puzzle-container';
@@ -782,6 +738,7 @@ document.addEventListener('DOMContentLoaded', () => {
             for (let col = 0; col < gridSize[1]; col++) {
                 const cell = document.createElement('div');
                 cell.className = 'jigsaw-grid-cell';
+                cell.id = `jigsaw-cell-${row}-${col}`;
                 cell.dataset.row = row;
                 cell.dataset.col = col;
                 cell.style.width = `${pieceSize}px`;
@@ -941,6 +898,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!placedPieceIndices.has(index)) {
                     const pieceWrapper = document.createElement('div');
                     pieceWrapper.className = 'jigsaw-tray-piece';
+                    pieceWrapper.id = `jigsaw-piece-${index}`;
                     pieceWrapper.dataset.pieceIndex = index;
                     pieceWrapper.style.width = `${pieceSize * 0.6}px`;
                     pieceWrapper.style.height = `${pieceSize * 0.6}px`;
@@ -991,6 +949,7 @@ document.addEventListener('DOMContentLoaded', () => {
         submitSection.style.marginTop = '20px';
 
         const jigsawSubmitBtn = document.createElement('button');
+        jigsawSubmitBtn.id = 'jigsaw-submit';
         jigsawSubmitBtn.textContent = 'Submit Puzzle';
         jigsawSubmitBtn.className = 'submit-jigsaw';
         jigsawSubmitBtn.style.padding = '12px 24px';
@@ -1019,23 +978,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // Validate that all placements have valid coordinates
-            const invalidPlacements = jigsawPlacements.filter(p =>
-                p.piece_index === undefined ||
-                p.grid_row === undefined ||
-                p.grid_col === undefined ||
-                isNaN(p.piece_index) ||
-                isNaN(p.grid_row) ||
-                isNaN(p.grid_col)
-            );
-
-            // If there are invalid placements, prevent submission
-            if (invalidPlacements.length > 0) {
-                console.error('Invalid placements detected:', invalidPlacements);
-                showError('Some puzzle pieces have invalid positions. Please try again.');
-                return;
-            }
-
+            // Allow submission - let backend validate correctness
             jigsawSubmitBtn.disabled = true;
             jigsawSubmitBtn.textContent = 'Processing...';
             submitAnswer();
@@ -1452,7 +1395,7 @@ document.addEventListener('DOMContentLoaded', () => {
         puzzleImageContainer.appendChild(submitSection);
     }
 
-    function setupSpookyGridSelect(data) {
+    function setupGridSelection(data) {
         if (inputGroup) {
             inputGroup.style.display = 'none';
         }
@@ -1465,7 +1408,7 @@ document.addEventListener('DOMContentLoaded', () => {
             resultMessage.style.marginTop = '20px';
         }
 
-        spookyGridSelectedCells = [];
+        selectedGridCells = [];
 
         puzzleImageContainer.style.display = 'block';
         puzzleImageContainer.style.width = '100%';
@@ -1531,11 +1474,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const gridContainer = document.createElement('div');
-        gridContainer.className = 'spooky-grid-container';
+        gridContainer.className = 'grid-container';
 
         // Add special class for Color_Counting to have white background
         if (data.puzzle_type === 'Color_Counting') {
             gridContainer.classList.add('color-counting-grid');
+        }
+
+        // Add special class for Hole_Counting for larger display with pixelated rendering
+        if (data.puzzle_type === 'Hole_Counting') {
+            gridContainer.classList.add('hole-counting-grid');
         }
 
         // Add special class for Trajectory_Recovery
@@ -1558,7 +1506,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         optionImages.forEach((src, index) => {
             const cell = document.createElement('div');
-            cell.className = 'spooky-grid-cell';
+            cell.className = 'grid-cell';
             cell.dataset.index = index;
 
             const img = document.createElement('img');
@@ -1568,15 +1516,15 @@ document.addEventListener('DOMContentLoaded', () => {
             cell.appendChild(img);
 
             const overlay = document.createElement('div');
-            overlay.className = 'spooky-grid-overlay';
+            overlay.className = 'grid-overlay';
             cell.appendChild(overlay);
 
             const checkmark = document.createElement('div');
-            checkmark.className = 'spooky-grid-checkmark';
+            checkmark.className = 'grid-checkmark';
             checkmark.textContent = '✓';
             cell.appendChild(checkmark);
 
-            cell.addEventListener('click', () => toggleSpookyGridSelection(index, cell));
+            cell.addEventListener('click', () => toggleGridSelection(index, cell));
 
             gridContainer.appendChild(cell);
         });
@@ -1584,14 +1532,14 @@ document.addEventListener('DOMContentLoaded', () => {
         puzzleImageContainer.appendChild(gridContainer);
 
         const submitSection = document.createElement('div');
-        submitSection.className = 'spooky-grid-submit';
+        submitSection.className = 'grid-submit';
 
         const spookySubmitBtn = document.createElement('button');
         spookySubmitBtn.textContent = 'Submit';
-        spookySubmitBtn.className = 'submit-spooky-grid';
+        spookySubmitBtn.className = 'submit-grid';
         spookySubmitBtn.type = 'button';
         spookySubmitBtn.addEventListener('click', () => {
-            if (!spookyGridSelectedCells.length) {
+            if (!selectedGridCells.length) {
                 showError('Select at least one cell before submitting.');
                 return;
             }
@@ -1604,13 +1552,13 @@ document.addEventListener('DOMContentLoaded', () => {
         puzzleImageContainer.appendChild(submitSection);
     }
 
-    function toggleSpookyGridSelection(index, cellElement) {
-        const overlay = cellElement.querySelector('.spooky-grid-overlay');
-        const checkmark = cellElement.querySelector('.spooky-grid-checkmark');
+    function toggleGridSelection(index, cellElement) {
+        const overlay = cellElement.querySelector('.grid-overlay');
+        const checkmark = cellElement.querySelector('.grid-checkmark');
 
-        const alreadySelected = spookyGridSelectedCells.includes(index);
+        const alreadySelected = selectedGridCells.includes(index);
         if (alreadySelected) {
-            spookyGridSelectedCells = spookyGridSelectedCells.filter((idx) => idx !== index);
+            selectedGridCells = selectedGridCells.filter((idx) => idx !== index);
             if (overlay) {
                 overlay.style.opacity = '0';
             }
@@ -1620,7 +1568,7 @@ document.addEventListener('DOMContentLoaded', () => {
             cellElement.style.transform = 'scale(1)';
             cellElement.style.borderColor = '#333';
         } else {
-            spookyGridSelectedCells.push(index);
+            selectedGridCells.push(index);
             if (overlay) {
                 overlay.style.opacity = '1';
             }
@@ -2080,14 +2028,19 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'circle_grid_direction_select':
             case 'shape_grid_select':
             case 'color_counting_select':
+            case 'hole_counting_select':
+            case 'rotation_match_select':
             case 'trajectory_recovery_select':
             case 'set_game_select':
-                answerData.answer = spookyGridSelectedCells;
-                if (!spookyGridSelectedCells.length) {
+                answerData.answer = selectedGridCells;
+                if (!selectedGridCells.length) {
                     showError('Select at least one cell before submitting.');
                     resetCustomSubmitButtons();
                     return;
                 }
+                break;
+            case 'spooky_size_click':
+                answerData.answer = spookySizeClickAnswer;
                 break;
             case 'storyboard_logic':
                 answerData.answer = storyboardOrder;
