@@ -958,9 +958,9 @@ body {
     image-rendering: -webkit-optimize-contrast;
 }
 
-/* Rotation Match Grid - Clean display for 120x120 images with rotated shapes */
+/* Rotation Match Grid - Clean display for 240x240 images with rotated shapes and fine textures */
 .grid-container.rotation-match-grid {
-    max-width: 720px;
+    max-width: 1000px;
     gap: 12px;
     padding: 16px;
     background-color: #f5f5f5;
@@ -969,8 +969,8 @@ body {
 .grid-container.rotation-match-grid .grid-cell {
     border: 3px solid #555;
     background-color: #fff;
-    width: 160px;
-    height: 160px;
+    width: 220px;
+    height: 220px;
 }
 
 .grid-container.rotation-match-grid .grid-cell:hover {
@@ -979,8 +979,8 @@ body {
 }
 
 .grid-container.rotation-match-grid .grid-cell img {
-    width: 160px;
-    height: 160px;
+    width: 220px;
+    height: 220px;
     image-rendering: auto;
     image-rendering: -webkit-optimize-contrast;
 }
