@@ -19,10 +19,15 @@ document.addEventListener('DOMContentLoaded', () => {
     let shadowSelectedCells = [];
     let mirrorSelectedCells = [];
     let squiggleSelectedIndex = null;
-    let spookyGridSelectedCells = [];
+    let transformPipelineSelectedIndex = null;
+    let selectedGridCells = [];
     let storyboardOrder = [];
     let storyboardSelectedIndices = [];
     let jigsawPlacements = [];
+
+    // Expose jigsawPlacements globally so agents can programmatically update it
+    window.jigsawPlacements = jigsawPlacements;
+
     let squiggleRevealTimeout = null;
     let colorCipherRevealTimeout = null;
     let redDotTimeout = null;
@@ -32,6 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let redDotTimeoutDuration = 2000;
     let redDotElement = null;
     let spookySizeAnswered = false;
+    let spookySizeClickAnswer = null;
 
     submitBtn.addEventListener('click', submitAnswer);
     userAnswerInput.addEventListener('keypress', (event) => {
@@ -48,9 +54,11 @@ document.addEventListener('DOMContentLoaded', () => {
         shadowSelectedCells = [];
         mirrorSelectedCells = [];
         squiggleSelectedIndex = null;
+        transformPipelineSelectedIndex = null;
         storyboardOrder = [];
         storyboardSelectedIndices = [];
         jigsawPlacements = [];
+        window.jigsawPlacements = jigsawPlacements;
         if (squiggleRevealTimeout) {
             clearTimeout(squiggleRevealTimeout);
             squiggleRevealTimeout = null;
@@ -108,10 +116,13 @@ document.addEventListener('DOMContentLoaded', () => {
             '.squiggle-preview',
             '.squiggle-options-grid',
             '.squiggle-submit',
+            '.transform-pipeline-container',
+            '.transform-pipeline-submit',
             '.color-cipher-preview',
             '.color-cipher-question',
             '.red-dot-area',
             '.trajectory-gif-container',
+            '.set-game-rules-container',
             '.storyboard-logic-container',
             '.jigsaw-puzzle-container'
         ];
@@ -283,12 +294,18 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'jigsaw_puzzle':
                 setupJigsawPuzzle(data);
                 break;
+            case 'transform_pipeline_select':
+                setupTransformPipelineSelect(data);
+                break;
             case 'circle_grid_select':
             case 'circle_grid_direction_select':
             case 'shape_grid_select':
             case 'color_counting_select':
+            case 'hole_counting_select':
+            case 'rotation_match_select':
             case 'trajectory_recovery_select':
-                setupSpookyGridSelect(data);
+            case 'set_game_select':
+                setupGridSelection(data);
                 break;
             default:
                 configureTextPuzzle(data);
@@ -448,67 +465,14 @@ document.addEventListener('DOMContentLoaded', () => {
             clickArea.style.pointerEvents = 'none';
             spookySizeAnswered = true;
 
-            // Submit answer
-            const answerData = {
-                puzzle_type: currentPuzzle.puzzle_type,
-                puzzle_id: currentPuzzle.puzzle_id,
-                answer: {
-                    position: {
-                        x: Number(clickX.toFixed(2)),
-                        y: Number(clickY.toFixed(2))
-                    }
+            // Store answer and submit using shared function
+            spookySizeClickAnswer = {
+                position: {
+                    x: Number(clickX.toFixed(2)),
+                    y: Number(clickY.toFixed(2))
                 }
             };
-            answerData.elapsed_time = ((Date.now() - (puzzleStartTime || Date.now())) / 1000).toFixed(2);
-
-            fetch('/api/check_answer', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(answerData)
-            })
-            .then(response => {
-                if (!response.ok) {
-                    return response.json().then(err => {
-                        throw new Error(err.error || `HTTP error! status: ${response.status}`);
-                    });
-                }
-                return response.json();
-            })
-            .then(result => {
-                if (result.error) {
-                    throw new Error(result.error);
-                }
-
-                benchmarkStats.total += 1;
-
-                if (result.correct) {
-                    benchmarkStats.correct += 1;
-                    resultMessage.textContent = 'Correct! You clicked the right shape.';
-                    resultMessage.className = 'result-message correct';
-                    createFireworks();
-                } else {
-                    resultMessage.textContent = 'Incorrect. Try the next puzzle.';
-                    resultMessage.className = 'result-message incorrect';
-                    createSadFace();
-                }
-
-                updateStats();
-                recordBenchmarkResult({
-                    puzzle_type: currentPuzzle.puzzle_type,
-                    puzzle_id: currentPuzzle.puzzle_id,
-                    user_answer: answerData.answer,
-                    correct_answer: result.correct_answer,
-                    correct: result.correct,
-                    elapsed_time: answerData.elapsed_time
-                });
-
-                setTimeout(() => loadNewPuzzle(), 2000);
-            })
-            .catch(error => {
-                console.error('Error submitting answer:', error);
-                resultMessage.textContent = `Error: ${error.message || 'Error submitting answer.'}`;
-                resultMessage.className = 'result-message incorrect';
-            });
+            submitAnswer();
         });
 
         puzzleImageContainer.appendChild(clickArea);
@@ -719,6 +683,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Initialize placements - all pieces start unplaced
         jigsawPlacements = [];
+        window.jigsawPlacements = jigsawPlacements;
 
         const container = document.createElement('div');
         container.className = 'jigsaw-puzzle-container';
@@ -773,6 +738,7 @@ document.addEventListener('DOMContentLoaded', () => {
             for (let col = 0; col < gridSize[1]; col++) {
                 const cell = document.createElement('div');
                 cell.className = 'jigsaw-grid-cell';
+                cell.id = `jigsaw-cell-${row}-${col}`;
                 cell.dataset.row = row;
                 cell.dataset.col = col;
                 cell.style.width = `${pieceSize}px`;
@@ -932,6 +898,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!placedPieceIndices.has(index)) {
                     const pieceWrapper = document.createElement('div');
                     pieceWrapper.className = 'jigsaw-tray-piece';
+                    pieceWrapper.id = `jigsaw-piece-${index}`;
                     pieceWrapper.dataset.pieceIndex = index;
                     pieceWrapper.style.width = `${pieceSize * 0.6}px`;
                     pieceWrapper.style.height = `${pieceSize * 0.6}px`;
@@ -982,6 +949,7 @@ document.addEventListener('DOMContentLoaded', () => {
         submitSection.style.marginTop = '20px';
 
         const jigsawSubmitBtn = document.createElement('button');
+        jigsawSubmitBtn.id = 'jigsaw-submit';
         jigsawSubmitBtn.textContent = 'Submit Puzzle';
         jigsawSubmitBtn.className = 'submit-jigsaw';
         jigsawSubmitBtn.style.padding = '12px 24px';
@@ -1004,29 +972,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         jigsawSubmitBtn.addEventListener('click', () => {
-            // Ensure all pieces are placed
-            const placedIndices = new Set(jigsawPlacements.map(p => p.piece_index));
-            if (jigsawPlacements.length !== pieces.length || placedIndices.size !== pieces.length) {
-                showError(`Please place all ${pieces.length} puzzle pieces before submitting. Currently placed: ${jigsawPlacements.length}`);
+            // Require at least one piece to be placed before submission (for all jigsaw types)
+            if (jigsawPlacements.length === 0) {
+                showError('Please place at least one puzzle piece before submitting.');
                 return;
             }
-            
-            // Validate that all placements have valid coordinates
-            const invalidPlacements = jigsawPlacements.filter(p => 
-                p.piece_index === undefined || 
-                p.grid_row === undefined || 
-                p.grid_col === undefined ||
-                isNaN(p.piece_index) ||
-                isNaN(p.grid_row) ||
-                isNaN(p.grid_col)
-            );
-            
-            if (invalidPlacements.length > 0) {
-                console.error('Invalid placements detected:', invalidPlacements);
-                showError('Some puzzle pieces have invalid positions. Please try again.');
-                return;
-            }
-            
+
+            // Allow submission - let backend validate correctness
             jigsawSubmitBtn.disabled = true;
             jigsawSubmitBtn.textContent = 'Processing...';
             submitAnswer();
@@ -1443,7 +1395,7 @@ document.addEventListener('DOMContentLoaded', () => {
         puzzleImageContainer.appendChild(submitSection);
     }
 
-    function setupSpookyGridSelect(data) {
+    function setupGridSelection(data) {
         if (inputGroup) {
             inputGroup.style.display = 'none';
         }
@@ -1456,7 +1408,7 @@ document.addEventListener('DOMContentLoaded', () => {
             resultMessage.style.marginTop = '20px';
         }
 
-        spookyGridSelectedCells = [];
+        selectedGridCells = [];
 
         puzzleImageContainer.style.display = 'block';
         puzzleImageContainer.style.width = '100%';
@@ -1483,12 +1435,55 @@ document.addEventListener('DOMContentLoaded', () => {
             puzzleImageContainer.appendChild(gifContainer);
         }
 
+        // For Set_Game, show rules explanation above the grid
+        if (data.puzzle_type === 'Set_Game') {
+            const rulesContainer = document.createElement('div');
+            rulesContainer.className = 'set-game-rules-container';
+            rulesContainer.style.backgroundColor = '#f5f5f5';
+            rulesContainer.style.border = '2px solid #333';
+            rulesContainer.style.borderRadius = '8px';
+            rulesContainer.style.padding = '15px';
+            rulesContainer.style.marginBottom = '20px';
+            rulesContainer.style.textAlign = 'left';
+
+            const rulesTitle = document.createElement('h3');
+            rulesTitle.textContent = 'Set Game Rules:';
+            rulesTitle.style.marginTop = '0';
+            rulesTitle.style.marginBottom = '10px';
+            rulesTitle.style.fontSize = '18px';
+            rulesTitle.style.fontWeight = 'bold';
+
+            const rulesText = document.createElement('div');
+            rulesText.innerHTML = `
+                <p style="margin: 5px 0;"><strong>Each card has 4 attributes:</strong></p>
+                <ul style="margin: 5px 0 5px 20px; padding: 0;">
+                    <li><strong>Shape:</strong> circle, square, or triangle</li>
+                    <li><strong>Color:</strong> red, green, or blue</li>
+                    <li><strong>Count:</strong> 1, 2, or 3 shapes per card</li>
+                    <li><strong>Fill:</strong> solid (filled), striped (lines), or empty (outline only)</li>
+                </ul>
+                <p style="margin: 5px 0;"><strong>How to find a valid Set:</strong> For each attribute, the 3 cards must be either <em>all the same</em> or <em>all different</em>.</p>
+                <p style="margin: 5px 0; font-style: italic;">Select exactly 3 cards that match the condition shown in the prompt below.</p>
+            `;
+            rulesText.style.fontSize = '14px';
+            rulesText.style.lineHeight = '1.5';
+
+            rulesContainer.appendChild(rulesTitle);
+            rulesContainer.appendChild(rulesText);
+            puzzleImageContainer.appendChild(rulesContainer);
+        }
+
         const gridContainer = document.createElement('div');
-        gridContainer.className = 'spooky-grid-container';
+        gridContainer.className = 'grid-container';
 
         // Add special class for Color_Counting to have white background
         if (data.puzzle_type === 'Color_Counting') {
             gridContainer.classList.add('color-counting-grid');
+        }
+
+        // Add special class for Hole_Counting for larger display with pixelated rendering
+        if (data.puzzle_type === 'Hole_Counting') {
+            gridContainer.classList.add('hole-counting-grid');
         }
 
         // Add special class for Trajectory_Recovery
@@ -1511,7 +1506,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         optionImages.forEach((src, index) => {
             const cell = document.createElement('div');
-            cell.className = 'spooky-grid-cell';
+            cell.className = 'grid-cell';
             cell.dataset.index = index;
 
             const img = document.createElement('img');
@@ -1521,15 +1516,15 @@ document.addEventListener('DOMContentLoaded', () => {
             cell.appendChild(img);
 
             const overlay = document.createElement('div');
-            overlay.className = 'spooky-grid-overlay';
+            overlay.className = 'grid-overlay';
             cell.appendChild(overlay);
 
             const checkmark = document.createElement('div');
-            checkmark.className = 'spooky-grid-checkmark';
+            checkmark.className = 'grid-checkmark';
             checkmark.textContent = '✓';
             cell.appendChild(checkmark);
 
-            cell.addEventListener('click', () => toggleSpookyGridSelection(index, cell));
+            cell.addEventListener('click', () => toggleGridSelection(index, cell));
 
             gridContainer.appendChild(cell);
         });
@@ -1537,14 +1532,14 @@ document.addEventListener('DOMContentLoaded', () => {
         puzzleImageContainer.appendChild(gridContainer);
 
         const submitSection = document.createElement('div');
-        submitSection.className = 'spooky-grid-submit';
+        submitSection.className = 'grid-submit';
 
         const spookySubmitBtn = document.createElement('button');
         spookySubmitBtn.textContent = 'Submit';
-        spookySubmitBtn.className = 'submit-spooky-grid';
+        spookySubmitBtn.className = 'submit-grid';
         spookySubmitBtn.type = 'button';
         spookySubmitBtn.addEventListener('click', () => {
-            if (!spookyGridSelectedCells.length) {
+            if (!selectedGridCells.length) {
                 showError('Select at least one cell before submitting.');
                 return;
             }
@@ -1557,13 +1552,13 @@ document.addEventListener('DOMContentLoaded', () => {
         puzzleImageContainer.appendChild(submitSection);
     }
 
-    function toggleSpookyGridSelection(index, cellElement) {
-        const overlay = cellElement.querySelector('.spooky-grid-overlay');
-        const checkmark = cellElement.querySelector('.spooky-grid-checkmark');
+    function toggleGridSelection(index, cellElement) {
+        const overlay = cellElement.querySelector('.grid-overlay');
+        const checkmark = cellElement.querySelector('.grid-checkmark');
 
-        const alreadySelected = spookyGridSelectedCells.includes(index);
+        const alreadySelected = selectedGridCells.includes(index);
         if (alreadySelected) {
-            spookyGridSelectedCells = spookyGridSelectedCells.filter((idx) => idx !== index);
+            selectedGridCells = selectedGridCells.filter((idx) => idx !== index);
             if (overlay) {
                 overlay.style.opacity = '0';
             }
@@ -1573,7 +1568,7 @@ document.addEventListener('DOMContentLoaded', () => {
             cellElement.style.transform = 'scale(1)';
             cellElement.style.borderColor = '#333';
         } else {
-            spookyGridSelectedCells.push(index);
+            selectedGridCells.push(index);
             if (overlay) {
                 overlay.style.opacity = '1';
             }
@@ -1696,6 +1691,147 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         squiggleSelectedIndex = index;
+        optionElement.classList.add('active');
+    }
+
+    function setupTransformPipelineSelect(data) {
+        if (inputGroup) {
+            inputGroup.style.display = 'none';
+        }
+        submitBtn.style.display = 'none';
+
+        transformPipelineSelectedIndex = null;
+
+        const optionImages = data.option_images || [];
+        if (!optionImages.length) {
+            showError('No transform pipeline options available.');
+            return;
+        }
+
+        const container = document.createElement('div');
+        container.className = 'transform-pipeline-container';
+
+        // Reference image section
+        const referenceSection = document.createElement('div');
+        referenceSection.className = 'transform-pipeline-reference';
+
+        const referenceLabel = document.createElement('div');
+        referenceLabel.className = 'transform-pipeline-label';
+        referenceLabel.textContent = 'Starting Image:';
+        referenceSection.appendChild(referenceLabel);
+
+        const referenceImage = document.createElement('img');
+        referenceImage.src = data.reference_image;
+        referenceImage.alt = 'Reference image';
+        referenceImage.draggable = false;
+        referenceImage.className = 'transform-pipeline-ref-image';
+        referenceSection.appendChild(referenceImage);
+
+        // Transform steps section
+        const stepsSection = document.createElement('div');
+        stepsSection.className = 'transform-pipeline-steps';
+
+        const stepsLabel = document.createElement('div');
+        stepsLabel.className = 'transform-pipeline-label';
+        stepsLabel.textContent = 'Transform Steps:';
+        stepsSection.appendChild(stepsLabel);
+
+        const stepsList = document.createElement('div');
+        stepsList.className = 'transform-pipeline-steps-list';
+        (data.transform_steps || []).forEach((step, idx) => {
+            const stepItem = document.createElement('div');
+            stepItem.className = 'transform-pipeline-step';
+            stepItem.textContent = `${idx + 1}. ${step}`;
+            stepsList.appendChild(stepItem);
+        });
+        stepsSection.appendChild(stepsList);
+
+        container.appendChild(referenceSection);
+        container.appendChild(stepsSection);
+
+        // Options grid
+        const optionsGrid = document.createElement('div');
+        optionsGrid.className = 'transform-pipeline-options-grid';
+
+        const optionsLabel = document.createElement('div');
+        optionsLabel.className = 'transform-pipeline-label';
+        optionsLabel.textContent = 'Select the correct result:';
+        optionsLabel.style.marginTop = '20px';
+        container.appendChild(optionsLabel);
+
+        puzzleImageContainer.style.display = 'block';
+
+        const gridSize = Array.isArray(data.grid_size) ? data.grid_size : null;
+        if (gridSize && gridSize.length > 1 && Number.isFinite(gridSize[1]) && gridSize[1] > 0) {
+            optionsGrid.style.gridTemplateColumns = `repeat(${gridSize[1]}, minmax(160px, 1fr))`;
+        } else if (optionImages.length === 4) {
+            optionsGrid.style.gridTemplateColumns = 'repeat(2, minmax(160px, 1fr))';
+        } else if (optionImages.length === 6) {
+            optionsGrid.style.gridTemplateColumns = 'repeat(3, minmax(160px, 1fr))';
+        }
+        optionsGrid.style.columnGap = '40px';
+        optionsGrid.style.rowGap = '32px';
+        optionsGrid.style.justifyContent = 'center';
+        optionsGrid.style.marginTop = '20px';
+
+        optionImages.forEach((src, index) => {
+            const option = document.createElement('div');
+            option.className = 'transform-pipeline-option';
+            option.dataset.index = index;
+
+            const img = document.createElement('img');
+            img.src = src;
+            img.alt = `Option ${index + 1}`;
+            img.draggable = false;
+            option.appendChild(img);
+
+            option.addEventListener('click', () => selectTransformPipelineOption(index, option));
+
+            optionsGrid.appendChild(option);
+        });
+
+        container.appendChild(optionsGrid);
+
+        // Submit button
+        const submitSection = document.createElement('div');
+        submitSection.className = 'transform-pipeline-submit';
+        submitSection.style.display = 'flex';
+        submitSection.style.justifyContent = 'center';
+        submitSection.style.marginTop = '20px';
+
+        const transformSubmitBtn = document.createElement('button');
+        transformSubmitBtn.className = 'submit-transform-pipeline';
+        transformSubmitBtn.type = 'button';
+        transformSubmitBtn.textContent = 'Submit';
+        transformSubmitBtn.addEventListener('click', () => {
+            if (transformPipelineSelectedIndex === null) {
+                showError('Select the correct transformed image.');
+                return;
+            }
+            transformSubmitBtn.disabled = true;
+            transformSubmitBtn.textContent = 'Processing...';
+            submitAnswer();
+        });
+
+        submitSection.appendChild(transformSubmitBtn);
+        container.appendChild(submitSection);
+
+        puzzleImageContainer.appendChild(container);
+    }
+
+    function selectTransformPipelineOption(index, optionElement) {
+        if (transformPipelineSelectedIndex === index) {
+            transformPipelineSelectedIndex = null;
+            optionElement.classList.remove('active');
+            return;
+        }
+
+        const previouslyActive = document.querySelector('.transform-pipeline-option.active');
+        if (previouslyActive) {
+            previouslyActive.classList.remove('active');
+        }
+
+        transformPipelineSelectedIndex = index;
         optionElement.classList.add('active');
     }
 
@@ -1869,6 +2005,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
                 break;
+            case 'transform_pipeline_select':
+                answerData.answer = transformPipelineSelectedIndex;
+                if (transformPipelineSelectedIndex === null) {
+                    showError('Select the correct transformed image.');
+                    resetCustomSubmitButtons();
+                    return;
+                }
+                break;
             case 'color_cipher':
                 if (!userAnswerInput.value.trim()) {
                     showError('Enter your answer before submitting.');
@@ -1884,13 +2028,19 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'circle_grid_direction_select':
             case 'shape_grid_select':
             case 'color_counting_select':
+            case 'hole_counting_select':
+            case 'rotation_match_select':
             case 'trajectory_recovery_select':
-                answerData.answer = spookyGridSelectedCells;
-                if (!spookyGridSelectedCells.length) {
+            case 'set_game_select':
+                answerData.answer = selectedGridCells;
+                if (!selectedGridCells.length) {
                     showError('Select at least one cell before submitting.');
                     resetCustomSubmitButtons();
                     return;
                 }
+                break;
+            case 'spooky_size_click':
+                answerData.answer = spookySizeClickAnswer;
                 break;
             case 'storyboard_logic':
                 answerData.answer = storyboardOrder;
@@ -1901,12 +2051,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 break;
             case 'jigsaw_puzzle':
-                answerData.answer = jigsawPlacements;
-                if (!jigsawPlacements || jigsawPlacements.length === 0) {
-                    showError('Please place at least one puzzle piece before submitting.');
-                    resetCustomSubmitButtons();
-                    return;
-                }
+                // Allow empty submissions - backend will mark as incorrect
+                answerData.answer = jigsawPlacements || [];
                 // Debug logging
                 console.log('Jigsaw placements being submitted:', JSON.stringify(jigsawPlacements, null, 2));
                 break;
@@ -1950,22 +2096,81 @@ document.addEventListener('DOMContentLoaded', () => {
                     resultMessage.className = 'result-message correct';
                     createFireworks();
                 } else {
-                    const errorMsg = data.correct_answer ? `Incorrect. ${data.correct_answer}` : 'Incorrect.';
-                    resultMessage.textContent = errorMsg;
+                    resultMessage.textContent = 'Incorrect. Try again.';
                     resultMessage.className = 'result-message incorrect';
                     createSadFace();
                 }
 
                 updateStats();
+                
+                // Calculate cost per puzzle if agent cost data is available
+                let cost_per_puzzle = null;
+                if (window.__agentCostData && window.__agentCostData.averageCostPerPuzzle !== undefined) {
+                    cost_per_puzzle = window.__agentCostData.averageCostPerPuzzle;
+                } else if (window.__agentCostTracker && window.__agentCostTracker.puzzleCount > 0) {
+                    // Fallback: calculate from tracker if available
+                    cost_per_puzzle = window.__agentCostTracker.getAverageCost();
+                }
+                
+                // Get model and provider metadata if available
+                // First try window.__agentMetadata, then fallback to localStorage
+                let model_name = null;
+                let provider_name = null;
+                let agent_framework = null;
+                
+                // Try to get from window first
+                if (window.__agentMetadata) {
+                    model_name = window.__agentMetadata.model || null;
+                    provider_name = window.__agentMetadata.provider || null;
+                    agent_framework = window.__agentMetadata.agentFramework || null;
+                }
+                
+                // Fallback to localStorage if window doesn't have it
+                if (!model_name && !provider_name) {
+                    try {
+                        const stored = localStorage.getItem('__agentMetadata');
+                        if (stored) {
+                            const metadata = JSON.parse(stored);
+                            model_name = metadata.model || null;
+                            provider_name = metadata.provider || null;
+                            agent_framework = metadata.agentFramework || null;
+                            // Also set it on window for future use
+                            window.__agentMetadata = metadata;
+                        }
+                    } catch(e) {
+                        console.warn('Could not read metadata from localStorage:', e);
+                    }
+                }
+                
+                // Debug logging (can be removed in production)
+                if (model_name || provider_name) {
+                    console.log('Recording benchmark result with metadata:', {
+                        model: model_name,
+                        provider: provider_name,
+                        agent_framework: agent_framework,
+                        source: window.__agentMetadata ? 'window' : 'localStorage'
+                    });
+                } else {
+                    console.warn('No agent metadata available when recording benchmark result', {
+                        hasWindowMetadata: !!window.__agentMetadata,
+                        localStorageValue: localStorage.getItem('__agentMetadata')
+                    });
+                }
+                
                 recordBenchmarkResult({
                     puzzle_type: currentPuzzle.puzzle_type,
                     puzzle_id: currentPuzzle.puzzle_id,
                     user_answer: answerData.answer,
                     correct_answer: data.correct_answer,
                     correct: data.correct,
-                    elapsed_time: answerData.elapsed_time
+                    elapsed_time: answerData.elapsed_time,
+                    ...(cost_per_puzzle !== null && { cost: cost_per_puzzle }),
+                    // Don't include model/provider/agent_framework here - let recordBenchmarkResult add them from metadata
                 });
 
+                // Reset custom submit buttons (including jigsaw) before loading new puzzle
+                resetCustomSubmitButtons();
+                
                 setTimeout(loadNewPuzzle, 2000);
             })
             .catch((error) => {
@@ -2004,6 +2209,12 @@ document.addEventListener('DOMContentLoaded', () => {
             squiggleButton.textContent = 'Submit';
         }
 
+        const transformPipelineButton = document.querySelector('.submit-transform-pipeline');
+        if (transformPipelineButton) {
+            transformPipelineButton.disabled = false;
+            transformPipelineButton.textContent = 'Submit';
+        }
+
         const storyboardButton = document.querySelector('.submit-storyboard');
         if (storyboardButton) {
             storyboardButton.disabled = false;
@@ -2031,6 +2242,45 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!result.timestamp) {
             result.timestamp = new Date().toISOString();
         }
+        
+        // Ensure cost is included if available from agent cost tracker
+        if (result.cost === undefined && window.__agentCostData && window.__agentCostData.averageCostPerPuzzle !== undefined) {
+            result.cost = window.__agentCostData.averageCostPerPuzzle;
+        }
+        
+        // Ensure model/provider metadata is included if available from agent metadata
+        // Check window first, then localStorage as fallback
+        let metadata = window.__agentMetadata;
+        if (!metadata || (!metadata.model && !metadata.provider)) {
+            try {
+                const stored = localStorage.getItem('__agentMetadata');
+                if (stored) {
+                    metadata = JSON.parse(stored);
+                    window.__agentMetadata = metadata; // Cache it
+                    console.log('Loaded metadata from localStorage:', metadata);
+                }
+            } catch(e) {
+                console.warn('Could not read metadata from localStorage:', e);
+            }
+        }
+        
+        // Always set metadata if available (overwrite any existing values)
+        if (metadata) {
+            if (metadata.model) {
+                result.model = metadata.model;
+            }
+            if (metadata.provider) {
+                result.provider = metadata.provider;
+            }
+            if (metadata.agentFramework) {
+                result.agent_framework = metadata.agentFramework;
+            }
+        } else {
+            console.warn('No metadata available in recordBenchmarkResult. window.__agentMetadata:', window.__agentMetadata, 'localStorage:', localStorage.getItem('__agentMetadata'));
+        }
+        
+        // Debug: Log what we're sending
+        console.log('Sending benchmark result:', JSON.stringify(result, null, 2));
 
         fetch('/api/benchmark_results', {
             method: 'POST',
@@ -2054,6 +2304,7 @@ document.addEventListener('DOMContentLoaded', () => {
             Red_Dot: 4,
             Storyboard_Logic: 3,
             Jigsaw_Puzzle: 2,
+            Transform_Pipeline: 4,
         };
 
         const difficulty = difficultyRatings[puzzleType] || 1;

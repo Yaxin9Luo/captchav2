@@ -288,7 +288,7 @@ body {
 .puzzle-image-container:has(.mirror-layout),
 .puzzle-image-container:has(.squiggle-options-grid),
 .puzzle-image-container:has(.shadow-plausible-grid),
-.puzzle-image-container:has(.spooky-grid-container),
+.puzzle-image-container:has(.grid-container),
 .puzzle-image-container:has(.bingo-grid) {
     display: block;
     flex-direction: column;
@@ -807,7 +807,7 @@ body {
 }
 
 /* Spooky Grid CAPTCHA Styles */
-.spooky-grid-container {
+.grid-container {
     max-width: 480px;
     width: 100%;
     margin: 0 auto;
@@ -819,7 +819,7 @@ body {
     border-radius: 8px;
 }
 
-.spooky-grid-cell {
+.grid-cell {
     position: relative;
     border-radius: 4px;
     overflow: hidden;
@@ -830,20 +830,20 @@ body {
     aspect-ratio: 1 / 1;
 }
 
-.spooky-grid-cell:hover {
+.grid-cell:hover {
     transform: scale(1.02);
     border-color: #0078ff;
     box-shadow: 0 4px 12px rgba(0, 120, 255, 0.3);
 }
 
-.spooky-grid-cell img {
+.grid-cell img {
     width: 100%;
     height: 100%;
     object-fit: cover;
     display: block;
 }
 
-.spooky-grid-overlay {
+.grid-overlay {
     position: absolute;
     top: 0;
     left: 0;
@@ -855,7 +855,7 @@ body {
     pointer-events: none;
 }
 
-.spooky-grid-checkmark {
+.grid-checkmark {
     position: absolute;
     top: 50%;
     left: 50%;
@@ -869,12 +869,12 @@ body {
     text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
 }
 
-.spooky-grid-submit {
+.grid-submit {
     margin-top: 20px;
     text-align: center;
 }
 
-.submit-spooky-grid {
+.submit-grid {
     background-color: #0078ff;
     color: white;
     border: none;
@@ -887,48 +887,102 @@ body {
     box-shadow: 0 4px 12px rgba(0, 120, 255, 0.3);
 }
 
-.submit-spooky-grid:hover {
+.submit-grid:hover {
     background-color: #0056b3;
     box-shadow: 0 6px 16px rgba(0, 120, 255, 0.4);
     transform: translateY(-1px);
 }
 
-.submit-spooky-grid:disabled {
+.submit-grid:disabled {
     background-color: #95a5a6;
     cursor: not-allowed;
     box-shadow: none;
 }
 
 @media (max-width: 600px) {
-    .spooky-grid-container {
+    .grid-container {
         max-width: 100%;
         gap: 6px;
         padding: 8px;
     }
 
-    .spooky-grid-checkmark {
+    .grid-checkmark {
         font-size: 36px;
     }
 
-    .submit-spooky-grid {
+    .submit-grid {
         width: 100%;
     }
 }
 
 /* Color Counting Grid - White Background Variant */
-.spooky-grid-container.color-counting-grid {
+.grid-container.color-counting-grid {
     background-color: #ffffff;
     border: 2px solid #ddd;
     max-width: 640px;
 }
 
-.spooky-grid-container.color-counting-grid .spooky-grid-cell {
+.grid-container.color-counting-grid .grid-cell {
     border: 2px solid #ccc;
     background-color: #fff;
 }
 
-.spooky-grid-container.color-counting-grid .spooky-grid-cell:hover {
+.grid-container.color-counting-grid .grid-cell:hover {
     border-color: #0078ff;
+}
+
+/* Hole Counting Grid - Clean display for 120x120 images with clear patterns */
+.grid-container.hole-counting-grid {
+    max-width: 720px;
+    gap: 12px;
+    padding: 16px;
+    background-color: #f5f5f5;
+}
+
+.grid-container.hole-counting-grid .grid-cell {
+    border: 3px solid #555;
+    background-color: #fff;
+    width: 160px;
+    height: 160px;
+}
+
+.grid-container.hole-counting-grid .grid-cell:hover {
+    border-color: #0078ff;
+    transform: scale(1.03);
+}
+
+.grid-container.hole-counting-grid .grid-cell img {
+    width: 160px;
+    height: 160px;
+    image-rendering: auto;
+    image-rendering: -webkit-optimize-contrast;
+}
+
+/* Rotation Match Grid - Clean display for 240x240 images with rotated shapes and fine textures */
+.grid-container.rotation-match-grid {
+    max-width: 1000px;
+    gap: 12px;
+    padding: 16px;
+    background-color: #f5f5f5;
+}
+
+.grid-container.rotation-match-grid .grid-cell {
+    border: 3px solid #555;
+    background-color: #fff;
+    width: 220px;
+    height: 220px;
+}
+
+.grid-container.rotation-match-grid .grid-cell:hover {
+    border-color: #0078ff;
+    transform: scale(1.03);
+}
+
+.grid-container.rotation-match-grid .grid-cell img {
+    width: 220px;
+    height: 220px;
+    image-rendering: auto;
+    image-rendering: -webkit-optimize-contrast;
 }
 
 .mirror-layout {
@@ -1227,6 +1281,178 @@ body {
 
     .squiggle-preview {
         padding: 16px;
+    }
+}
+
+/* Transform Pipeline puzzle */
+.transform-pipeline-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    padding: 20px;
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.transform-pipeline-reference {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+}
+
+.transform-pipeline-steps {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    background-color: #f8f9fa;
+    padding: 16px;
+    border-radius: 8px;
+    border: 2px solid #e2e8f0;
+}
+
+.transform-pipeline-label {
+    font-weight: 600;
+    font-size: 18px;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.transform-pipeline-ref-image {
+    max-width: 100%;
+    max-height: 300px;
+    object-fit: contain;
+    border-radius: 8px;
+    background-color: #ffffff;
+    border: 2px solid #e2e8f0;
+    padding: 8px;
+}
+
+.transform-pipeline-steps-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    text-align: left;
+}
+
+.transform-pipeline-step {
+    padding: 10px 16px;
+    background-color: #ffffff;
+    border-radius: 6px;
+    border-left: 4px solid var(--primary-color);
+    font-size: 16px;
+    color: var(--text-primary);
+    line-height: 1.5;
+}
+
+.transform-pipeline-options-grid {
+    display: grid;
+    gap: 24px;
+    width: 100%;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0 20px;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    justify-content: center;
+}
+
+.transform-pipeline-option {
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    background-color: #ffffff;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    min-height: 200px;
+    aspect-ratio: 4 / 3;
+    max-width: 100%;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.transform-pipeline-option img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background-color: #ffffff;
+    padding: 8px;
+}
+
+.transform-pipeline-option:hover {
+    transform: translateY(-2px);
+    border-color: var(--primary-color);
+    box-shadow: 0 8px 20px rgba(99, 102, 241, 0.25);
+}
+
+.transform-pipeline-option.active {
+    border-color: var(--primary-color);
+    box-shadow: 0 10px 24px rgba(99, 102, 241, 0.35);
+    background-color: rgba(99, 102, 241, 0.05);
+}
+
+.transform-pipeline-submit {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    margin-top: 24px;
+}
+
+.submit-transform-pipeline {
+    padding: 14px 32px;
+    background-color: var(--primary-color);
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    font-size: 17px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 6px 16px rgba(99, 102, 241, 0.3);
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.submit-transform-pipeline:hover {
+    background-color: var(--primary-dark);
+    transform: translateY(-1px);
+}
+
+.submit-transform-pipeline:disabled {
+    background-color: #95a5a6;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.puzzle-image-container:has(.transform-pipeline-container) {
+    display: block;
+    flex-direction: column;
+}
+
+@media (max-width: 600px) {
+    .transform-pipeline-options-grid {
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 20px;
+        padding: 0 10px;
+    }
+
+    .transform-pipeline-container {
+        padding: 16px;
+    }
+
+    .transform-pipeline-ref-image {
+        max-height: 200px;
+    }
+
+    .transform-pipeline-step {
+        font-size: 14px;
+        padding: 8px 12px;
     }
 }
 

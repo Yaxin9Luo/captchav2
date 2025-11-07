@@ -204,6 +204,25 @@ def _run_crewai(args: argparse.Namespace) -> str:
 	llm = _resolve_llm(args.provider, args.model, args.temperature)
 	browser_tool = BrowserTool()
 
+	# Extract model name and provider for metadata injection
+	model_name = args.model if args.model else None
+	if not model_name:
+		defaults = {
+			'openai': 'gpt-4o-mini',
+			'anthropic': 'claude-3-7-sonnet-20250219',
+			'google': 'gemini-2.0-flash',
+			'groq': 'llama-3.1-70b-versatile',
+			'azure-openai': None,
+		}
+		model_name = defaults.get(args.provider, 'default')
+	
+	# Get provider name
+	provider_name = args.provider.title()
+	if args.provider == 'azure-openai':
+		provider_name = 'Azure OpenAI'
+	
+	agent_framework_name = 'crewai'
+
 	agent = Agent(
 		role='CAPTCHA Solver',
 		goal=f'Solve up to {args.limit} puzzles on the OpenCaptchaWorld benchmark accurately.',
@@ -230,7 +249,80 @@ def _run_crewai(args: argparse.Namespace) -> str:
 		verbose=args.verbose,
 	)
 
-	result = crew.kickoff()
+	# Track cost using LangChain callbacks
+	total_cost = 0.0
+	get_openai_callback = None
+	
+	# Try to import cost tracking callback
+	try:
+		from langchain.callbacks import get_openai_callback
+	except ImportError:
+		try:
+			from langchain_community.callbacks import get_openai_callback
+		except ImportError:
+			try:
+				from langchain_core.callbacks import get_openai_callback
+			except ImportError:
+				get_openai_callback = None
+	
+	# Try to track cost if callback is available
+	if get_openai_callback and args.provider in ('openai', 'azure-openai'):
+		with get_openai_callback() as cb:
+			result = crew.kickoff()
+			if hasattr(cb, 'total_cost'):
+				total_cost = float(cb.total_cost)
+			elif hasattr(cb, 'cost'):
+				total_cost = float(cb.cost)
+	else:
+		# For other providers or if callback not available, try to extract from result
+		result = crew.kickoff()
+		# Try to get cost from crew execution info if available
+		if hasattr(crew, 'usage') and crew.usage:
+			if hasattr(crew.usage, 'total_cost'):
+				total_cost = float(crew.usage.total_cost)
+			elif hasattr(crew.usage, 'cost'):
+				total_cost = float(crew.usage.cost)
+		# Try to get cost from result if available
+		if total_cost == 0.0 and hasattr(result, 'usage'):
+			if hasattr(result.usage, 'total_cost'):
+				total_cost = float(result.usage.total_cost)
+			elif hasattr(result.usage, 'cost'):
+				total_cost = float(result.usage.cost)
+	
+	# Log cost information
+	if total_cost > 0.0:
+		logging.info('Total token cost: $%.6f', total_cost)
+		# Calculate average cost per puzzle (approximate)
+		average_cost_per_puzzle = total_cost / args.limit if args.limit > 0 else 0.0
+		logging.info('Estimated average cost per puzzle: $%.6f (based on %d puzzle limit)', average_cost_per_puzzle, args.limit)
+		
+		# Inject cost data and metadata into browser page if browser tool is available
+		# Note: CrewAI's BrowserTool may not expose the browser instance directly
+		# This is a best-effort attempt to inject cost data
+		try:
+			if hasattr(browser_tool, 'browser') and browser_tool.browser:
+				import json as json_module
+				cost_injection_script = f"""
+				window.__agentCostData = {{
+					totalCost: {total_cost},
+					averageCostPerPuzzle: {average_cost_per_puzzle},
+					puzzleCount: {args.limit}
+				}};
+				window.__agentMetadata = {{
+					model: {json_module.dumps(model_name)},
+					provider: {json_module.dumps(provider_name)},
+					agentFramework: {json_module.dumps(agent_framework_name)}
+				}};
+				"""
+				# Try to execute script in browser
+				if hasattr(browser_tool.browser, 'execute_script'):
+					browser_tool.browser.execute_script(cost_injection_script)
+				elif hasattr(browser_tool.browser, 'evaluate'):
+					browser_tool.browser.evaluate(cost_injection_script)
+		except Exception as e:
+			if args.verbose:
+				logging.debug('Could not inject cost/metadata data into browser: %s', e)
+	
 	return _extract_output(result)
 
 
