@@ -904,19 +904,24 @@ def aggregate_runs_to_csv():
     """
     Aggregate all JSON files in runs/ directory into results.csv.
     This consolidates all uploaded evaluation results into a single CSV file.
+    Deduplicates records based on (Model, Provider, Agent Framework) combination,
+    keeping the most recent entry for each unique combination.
     """
     runs_path = get_runs_path()
     results_path = get_results_path()
     
-    # Gather all JSON files
-    records = []
+    # Gather all JSON files with their modification times
+    records_with_time = []
     for path in runs_path.glob("*.json"):
         try:
-            records.append(json.loads(path.read_text()))
+            record = json.loads(path.read_text())
+            # Store modification time for deduplication (most recent wins)
+            mtime = path.stat().st_mtime
+            records_with_time.append((mtime, record))
         except Exception as e:
             print(f"Warning: Skipping invalid JSON file {path}: {e}")
     
-    if not records:
+    if not records_with_time:
         # Create empty CSV with headers
         fixed_metadata = ["Model", "Provider", "Agent Framework", "Type"]
         fixed_metrics = ["Overall Pass Rate", "Avg Duration (s)", "Avg Cost ($)"]
@@ -925,9 +930,13 @@ def aggregate_runs_to_csv():
             w.writeheader()
         return
     
+    # Sort by modification time (most recent first)
+    records_with_time.sort(key=lambda x: x[0], reverse=True)
+    
     # Handle legacy column names and infer Type
     legacy_map = {"Notes": "Agent Framework", "Overall": "Overall Pass Rate"}
-    for record in records:
+    processed_records = []
+    for mtime, record in records_with_time:
         for old_key, new_key in legacy_map.items():
             if old_key in record and new_key not in record:
                 record[new_key] = record.pop(old_key)
@@ -935,11 +944,39 @@ def aggregate_runs_to_csv():
         # Infer Type if not present
         if "Type" not in record:
             record["Type"] = infer_type(record)
+        
+        processed_records.append(record)
+    
+    # Deduplicate: keep only the most recent record for each (Model, Provider, Agent Framework) combination
+    seen = {}
+    deduplicated_records = []
+    
+    for record in processed_records:
+        # Create unique key from Model, Provider, and Agent Framework
+        model = str(record.get("Model", "")).strip()
+        provider = str(record.get("Provider", "")).strip()
+        agent_framework = str(record.get("Agent Framework", "")).strip()
+        unique_key = (model, provider, agent_framework)
+        
+        # Only add if we haven't seen this combination before
+        # Since records are sorted by time (most recent first), the first occurrence is kept
+        if unique_key not in seen:
+            seen[unique_key] = True
+            deduplicated_records.append(record)
+    
+    if not deduplicated_records:
+        # Create empty CSV with headers
+        fixed_metadata = ["Model", "Provider", "Agent Framework", "Type"]
+        fixed_metrics = ["Overall Pass Rate", "Avg Duration (s)", "Avg Cost ($)"]
+        with results_path.open("w", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=fixed_metadata + fixed_metrics)
+            w.writeheader()
+        return
     
     # Build header: metadata → metrics → puzzle types
     fixed_metadata = ["Model", "Provider", "Agent Framework", "Type"]
     fixed_metrics = ["Overall Pass Rate", "Avg Duration (s)", "Avg Cost ($)"]
-    puzzle_types = sorted({k for r in records for k in r.keys() 
+    puzzle_types = sorted({k for r in deduplicated_records for k in r.keys() 
                           if k not in fixed_metadata + fixed_metrics})
     header = fixed_metadata + fixed_metrics + puzzle_types
     
@@ -948,7 +985,7 @@ def aggregate_runs_to_csv():
     with results_path.open("w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=header)
         w.writeheader()
-        for r in records:
+        for r in deduplicated_records:
             w.writerow(r)
 
 def render(category, sort_column, sort_direction, model_filter="Models Avg"):
