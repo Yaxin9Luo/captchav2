@@ -1,0 +1,3 @@
+Model,Provider,Agent Framework,Type,Overall Pass Rate,Avg Duration (s),Avg Cost ($),Color_Cipher,Color_Counting,Dice_Count,Dynamic_Jigsaw,Static_Puzzle,Map_Parity,Mirror,Red_Dot,Set_Game,Shadow_Plausible,Spooky_Circle,Spooky_Circle_Grid,Spooky_Jigsaw,Spooky_Shape_Grid,Spooky_Size,Spooky_Text,Squiggle,Trajectory_Recovery,Transform_Pipeline
+gpt-5-2025-08-07,OpenAI,browser-use,Proprietary,0.16363636363636364, 10, 24.1,0.15,0.0,0.0,0.2,,,0.2,0.3,,0.0,0.2,0.4,,,0.0,0.0,0.35,,
+Browser-Use BU-1.0,browser-use,browser-use,Proprietary,0.03333333333333333, 2,8.3,0.1,0.0,0.0,,0.0,,0.1,0.0,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.2,0.0,0.0
