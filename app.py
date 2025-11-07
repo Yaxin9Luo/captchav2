@@ -32,7 +32,7 @@ PUZZLE_TYPE_SEQUENCE = [
     # 'Hole_Counting',
     # 'Rotation_Match',
     # 'Trajectory_Recovery',
-    # 'Spooky_Size',
+    'Spooky_Size',
     # 'Spooky_Circle',
     # 'Spooky_Circle_Grid',
     # 'Spooky_Shape_Grid',
@@ -43,7 +43,7 @@ PUZZLE_TYPE_SEQUENCE = [
     # 'Transform_Pipeline',
     # 'Set_Game',
     # 'Dynamic_Jigsaw',
-    'Spooky_Jigsaw',
+    # 'Spooky_Jigsaw',
 ]
 sequential_index = 0
 
@@ -2652,6 +2652,12 @@ def check_answer():
         response_body['details'] = {
             'user_placements': user_answer if puzzle_type == 'Static_Jigsaw' else None,
             'correct_positions': correct_answer_info if puzzle_type == 'Static_Jigsaw' else None
+        }
+    elif (puzzle_type == 'Dynamic_Jigsaw' or puzzle_type == 'Spooky_Jigsaw') and not is_correct:
+        # Include debug details for incorrect jigsaw puzzles
+        response_body['details'] = {
+            'user_placements': user_answer,
+            'correct_positions': correct_answer_info
         }
 
     return jsonify(response_body)
