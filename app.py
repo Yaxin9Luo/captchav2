@@ -31,8 +31,9 @@ PUZZLE_TYPE_SEQUENCE = [
     # 'Color_Counting',
     # 'Hole_Counting',
     # 'Rotation_Match',
+    'Rhythm',
     # 'Trajectory_Recovery',
-    'Spooky_Size',
+    # 'Spooky_Size',
     # 'Spooky_Circle',
     # 'Spooky_Circle_Grid',
     # 'Spooky_Shape_Grid',
@@ -1754,6 +1755,8 @@ def get_puzzle():
         input_type = "hole_counting_select"
     elif puzzle_type == "Rotation_Match":
         input_type = "rotation_match_select"
+    elif puzzle_type == "Rhythm":
+        input_type = "rhythm_select"
     elif puzzle_type == "Spooky_Text":
         input_type = "text"
     elif puzzle_type == "Color_Cipher":
@@ -1947,6 +1950,37 @@ def get_puzzle():
                 return jsonify({'error': f'Cell not found in pool: {cell_id}'}), 500
 
         additional_data = {
+            "option_images": cell_images,
+            "grid_size": ground_truth[selected_puzzle].get("grid_size", [4, 4]),
+            "answer": ground_truth[selected_puzzle].get("answer", [])
+        }
+    elif puzzle_type == "Rhythm":
+        # Load cell pool to map cell IDs to filenames
+        cell_pool_path = os.path.join('captcha_data', puzzle_type, 'cell_pool.json')
+        with open(cell_pool_path) as f:
+            cell_pool = json.load(f)
+
+        cell_ids = ground_truth[selected_puzzle].get("cells", [])
+        reference_cell = ground_truth[selected_puzzle].get("reference_cell")
+        if not cell_ids or not reference_cell:
+            return jsonify({'error': f'Invalid Rhythm data: {selected_puzzle}'}), 500
+
+        # Convert cell IDs to GIF paths
+        cell_images = []
+        for cell_id in cell_ids:
+            if cell_id in cell_pool:
+                cell_images.append(f'/captcha_data/{puzzle_type}/{cell_pool[cell_id]["filename"]}')
+            else:
+                return jsonify({'error': f'Cell not found in pool: {cell_id}'}), 500
+
+        # Get reference GIF
+        if reference_cell in cell_pool:
+            reference_gif = f'/captcha_data/{puzzle_type}/{cell_pool[reference_cell]["filename"]}'
+        else:
+            return jsonify({'error': f'Reference cell not found: {reference_cell}'}), 500
+
+        additional_data = {
+            "reference_gif": reference_gif,
             "option_images": cell_images,
             "grid_size": ground_truth[selected_puzzle].get("grid_size", [4, 4]),
             "answer": ground_truth[selected_puzzle].get("answer", [])
@@ -2295,6 +2329,14 @@ def check_answer():
             correct_answer_info = correct_indices
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid answer format for Rotation_Match'}), 400
+    elif puzzle_type == 'Rhythm':
+        try:
+            correct_indices = sorted(ground_truth[puzzle_id].get('answer', []))
+            user_indices = sorted(int(idx) for idx in user_answer)
+            is_correct = user_indices == correct_indices
+            correct_answer_info = correct_indices
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid answer format for Rhythm'}), 400
     elif puzzle_type == 'Trajectory_Recovery':
         try:
             correct_indices = sorted(ground_truth[puzzle_id].get('answer', []))

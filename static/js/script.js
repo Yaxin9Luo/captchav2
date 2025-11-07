@@ -303,6 +303,7 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'color_counting_select':
             case 'hole_counting_select':
             case 'rotation_match_select':
+            case 'rhythm_select':
             case 'trajectory_recovery_select':
             case 'set_game_select':
                 setupGridSelection(data);
@@ -1409,6 +1410,24 @@ document.addEventListener('DOMContentLoaded', () => {
         puzzleImageContainer.style.maxWidth = '960px';
         puzzleImageContainer.style.margin = '0 auto';
 
+        // For Rhythm, show the reference GIF above the grid
+        if (data.puzzle_type === 'Rhythm' && data.reference_gif) {
+            const refContainer = document.createElement('div');
+            refContainer.className = 'rhythm-reference';
+
+            const refLabel = document.createElement('div');
+            refLabel.className = 'rhythm-reference-label';
+            refLabel.textContent = 'Reference Rhythm:';
+            refContainer.appendChild(refLabel);
+
+            const refImg = document.createElement('img');
+            refImg.src = data.reference_gif;
+            refImg.alt = 'Reference rhythm pattern';
+            refContainer.appendChild(refImg);
+
+            puzzleImageContainer.appendChild(refContainer);
+        }
+
         // For Trajectory_Recovery, show the movement GIF above the grid
         if (data.puzzle_type === 'Trajectory_Recovery' && data.movement_gif) {
             const gifContainer = document.createElement('div');
@@ -2024,6 +2043,7 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'color_counting_select':
             case 'hole_counting_select':
             case 'rotation_match_select':
+            case 'rhythm_select':
             case 'trajectory_recovery_select':
             case 'set_game_select':
                 answerData.answer = selectedGridCells;
