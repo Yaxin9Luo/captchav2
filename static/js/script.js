@@ -972,13 +972,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         jigsawSubmitBtn.addEventListener('click', () => {
-            // Require at least one piece to be placed before submission (for all jigsaw types)
-            if (jigsawPlacements.length === 0) {
-                showError('Please place at least one puzzle piece before submitting.');
-                return;
-            }
-
-            // Allow submission - let backend validate correctness
+            // Allow empty submissions - backend will mark as incorrect and move to next puzzle
             jigsawSubmitBtn.disabled = true;
             jigsawSubmitBtn.textContent = 'Processing...';
             submitAnswer();
@@ -2303,7 +2297,7 @@ document.addEventListener('DOMContentLoaded', () => {
             Color_Cipher: 3,
             Red_Dot: 4,
             Storyboard_Logic: 3,
-            Jigsaw_Puzzle: 2,
+            Static_Jigsaw: 2,
             Transform_Pipeline: 4,
         };
 
