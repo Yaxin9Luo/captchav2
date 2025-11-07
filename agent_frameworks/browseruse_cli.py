@@ -10,6 +10,9 @@ import asyncio
 import json
 import logging
 import textwrap
+import urllib.error
+import urllib.request
+from urllib.parse import urljoin
 from typing import Callable, Optional
 
 from browser_use import Agent, Browser
@@ -272,6 +275,36 @@ def _get_model_info(args: argparse.Namespace, llm_name: str) -> str:
 	return f'{llm_name} ({model_desc})'
 
 
+def _post_agent_metadata_to_server(base_url: str, metadata: dict[str, str]) -> None:
+	"""Notify the benchmark server about the active agent metadata."""
+	if not base_url:
+		return
+
+	try:
+		endpoint = urljoin(base_url if base_url.endswith('/') else base_url + '/', 'api/agent_metadata')
+	except Exception as exc:  # pragma: no cover - defensive
+		logging.debug('Could not build agent metadata endpoint: %s', exc)
+		return
+
+	try:
+		request_body = json.dumps(metadata).encode('utf-8')
+		req = urllib.request.Request(
+			endpoint,
+			data=request_body,
+			headers={'Content-Type': 'application/json'},
+		)
+		with urllib.request.urlopen(req, timeout=5) as resp:
+			status = getattr(resp, 'status', None)
+			if status and status >= 400:
+				logging.debug('Agent metadata registration returned HTTP %s', status)
+			else:
+				logging.debug('Registered agent metadata with server (%s)', metadata)
+	except urllib.error.URLError as exc:
+		logging.debug('Could not send agent metadata to server: %s', exc)
+	except Exception as exc:  # pragma: no cover - defensive
+		logging.debug('Unexpected error when sending agent metadata: %s', exc)
+
+
 async def _run_agent(args: argparse.Namespace) -> int:
 	"""Run the browser-use agent with the provided CLI options."""
 	llm_factories = _create_llm_factory()
@@ -345,12 +378,15 @@ async def _run_agent(args: argparse.Namespace) -> int:
 			if isinstance(actual_model, str):
 				model_name = actual_model.split('(')[0].strip() if '(' in actual_model else actual_model
 	
-	# Get provider name
-	provider_name = llm_name.title()
+	# Get provider name - use lowercase with hyphen to match browser-use library format
+	provider_name = llm_name.lower()
 	if llm_name == 'browser-use':
-		provider_name = 'Browser Use'
+		provider_name = 'browser-use'  # Keep as-is to match library format
 	elif llm_name == 'azure-openai':
-		provider_name = 'Azure OpenAI'
+		provider_name = 'azure-openai'
+	
+	# Log initial metadata values for debugging
+	logging.info(f'Initial metadata - Model: {model_name}, Provider: {provider_name}, Framework: browser-use')
 	
 	browser = _create_browser(args)
 	task = _build_task_prompt(args.url, args.limit)
@@ -372,6 +408,120 @@ async def _run_agent(args: argparse.Namespace) -> int:
 		**agent_kwargs,
 	)
 
+	# Try to extract actual model name from agent after creation
+	# The browser-use library logs the model name during Agent initialization
+	# Try to get it from agent.llm or agent's internal state
+	if llm_name == 'browser-use':
+		try:
+			# Try to get model from agent's llm attribute
+			agent_llm = getattr(agent, 'llm', None) or llm
+			# Try various ways to get the actual model name
+			extracted_model = None
+			
+			# Method 1: Check agent.llm directly
+			if agent_llm:
+				extracted_model = (
+					getattr(agent_llm, 'model_name', None) or
+					getattr(agent_llm, 'model', None) or
+					getattr(agent_llm, '_model_name', None)
+				)
+			
+			# Method 2: Check nested llm objects and their __dict__
+			if not extracted_model and agent_llm:
+				for attr_name in ['llm', '_llm', 'client', '_client', '_chat_model']:
+					nested = getattr(agent_llm, attr_name, None)
+					if nested:
+						# Try direct attributes
+						nested_model = (
+							getattr(nested, 'model_name', None) or
+							getattr(nested, 'model', None) or
+							getattr(nested, '_model_name', None) or
+							getattr(nested, '_model', None)
+						)
+						if nested_model:
+							extracted_model = nested_model
+							break
+						# Try checking __dict__ for model-related keys
+						if hasattr(nested, '__dict__'):
+							for key in nested.__dict__.keys():
+								if 'model' in key.lower():
+									value = getattr(nested, key, None)
+									if isinstance(value, str) and value:
+										extracted_model = value
+										break
+							if extracted_model:
+								break
+			
+			# Method 3: Try to get from agent's internal state and __dict__
+			if not extracted_model:
+				for attr_name in ['_llm', '_model', '_model_name']:
+					agent_model = getattr(agent, attr_name, None)
+					if agent_model:
+						if isinstance(agent_model, str):
+							extracted_model = agent_model
+						else:
+							extracted_model = (
+								getattr(agent_model, 'model_name', None) or
+								getattr(agent_model, 'model', None) or
+								getattr(agent_model, '_model_name', None) or
+								getattr(agent_model, '_model', None)
+							)
+						if extracted_model:
+							break
+				
+				# Check agent's __dict__ for model-related attributes
+				if not extracted_model and hasattr(agent, '__dict__'):
+					for key in agent.__dict__.keys():
+						if 'model' in key.lower():
+							value = getattr(agent, key, None)
+							if isinstance(value, str) and value:
+								extracted_model = value
+								break
+			
+			# Method 4: Deep inspection of agent_llm's __dict__
+			if not extracted_model and agent_llm and hasattr(agent_llm, '__dict__'):
+				for key, value in agent_llm.__dict__.items():
+					if 'model' in key.lower() and isinstance(value, str) and value:
+						extracted_model = value
+						break
+			
+			# If we found a model name, use it (clean it up if needed)
+			if extracted_model:
+				if isinstance(extracted_model, str):
+					# Clean up the model name - remove any extra info in parentheses
+					clean_model = extracted_model.split('(')[0].strip() if '(' in extracted_model else extracted_model.strip()
+					# Remove quotes if present
+					clean_model = clean_model.strip('"\'')
+					if clean_model and clean_model != model_name:
+						model_name = clean_model
+						logging.info(f'Extracted actual model name from agent: {model_name}')
+			else:
+				# Fallback: Use "bu-1-0" for standard mode based on browser-use library logs
+				# The library logs show "model=bu-1-0" for the standard model
+				if not args.fast:
+					model_name = 'bu-1-0'
+					logging.info(f'Using fallback model name for browser-use standard mode: {model_name}')
+				# If we couldn't extract, log what we tried for debugging
+				if args.verbose:
+					logging.debug(f'Could not extract model name. agent.llm type: {type(agent_llm)}, agent type: {type(agent)}')
+		except Exception as e:
+			if args.verbose:
+				logging.debug('Could not extract model name from agent: %s', e)
+	
+	# Log final metadata values that will be injected
+	logging.info(f'Final metadata to inject - Model: {model_name}, Provider: {provider_name}, Framework: browser-use')
+
+	# Notify the benchmark server of the current metadata so it can enrich results
+	_post_agent_metadata_to_server(
+		args.url,
+		{
+			'model': model_name,
+			'provider': provider_name,
+			'agent_framework': 'browser-use',
+			'agentFramework': 'browser-use',
+		},
+	)
+
 	if args.verbose:
 		logging.getLogger('browser_use').setLevel(logging.DEBUG)
 
@@ -381,28 +531,87 @@ async def _run_agent(args: argparse.Namespace) -> int:
 	
 	# Inject cost tracking and metadata script into the browser page
 	# This will allow JavaScript to access cost data and model/provider info
+	# We use localStorage to persist metadata across page reloads
+	# NOTE: This script is created AFTER model extraction, so it uses the updated model_name
 	metadata_script = f"""
-	window.__agentMetadata = {{
-		model: {json.dumps(model_name)},
-		provider: {json.dumps(provider_name)},
-		agentFramework: "browser-use"
-	}};
-	window.__agentCostTracker = {{
-		costs: [],
-		totalCost: 0,
-		puzzleCount: 0,
-		addCost: function(cost) {{
-			this.costs.push(cost);
-			this.totalCost += cost;
-			this.puzzleCount += 1;
-		}},
-		getAverageCost: function() {{
-			return this.puzzleCount > 0 ? this.totalCost / this.puzzleCount : 0;
-		}},
-		getCurrentCost: function() {{
-			return this.totalCost;
+	(function() {{
+		// Store metadata in localStorage for persistence across page reloads
+		const METADATA = {json.dumps({"model": model_name, "provider": provider_name, "agentFramework": "browser-use"})};
+		try {{
+			if (typeof localStorage !== 'undefined') {{
+				localStorage.setItem('__agentMetadata', JSON.stringify(METADATA));
+				console.log('Stored agent metadata in localStorage:', METADATA);
+			}} else {{
+				console.warn('localStorage not available, metadata will not persist across page reloads');
+			}}
+		}} catch(e) {{
+			console.warn('Could not store metadata in localStorage:', e);
 		}}
-	}};
+		
+		function injectMetadata() {{
+			// First try to get from localStorage
+			try {{
+				const stored = localStorage.getItem('__agentMetadata');
+				if (stored) {{
+					window.__agentMetadata = JSON.parse(stored);
+				}} else {{
+					window.__agentMetadata = METADATA;
+				}}
+			}} catch(e) {{
+				window.__agentMetadata = METADATA;
+			}}
+			
+			if (!window.__agentCostTracker) {{
+				window.__agentCostTracker = {{
+					costs: [],
+					totalCost: 0,
+					puzzleCount: 0,
+					addCost: function(cost) {{
+						this.costs.push(cost);
+						this.totalCost += cost;
+						this.puzzleCount += 1;
+					}},
+					getAverageCost: function() {{
+						return this.puzzleCount > 0 ? this.totalCost / this.puzzleCount : 0;
+					}},
+					getCurrentCost: function() {{
+						return this.totalCost;
+					}}
+				}};
+			}}
+		}}
+		
+		// Inject immediately
+		injectMetadata();
+		
+		// Re-inject on page load (for SPA navigation)
+		if (document.readyState === 'loading') {{
+			document.addEventListener('DOMContentLoaded', injectMetadata);
+		}} else {{
+			injectMetadata();
+		}}
+		
+		// Also re-inject periodically to ensure it persists (every 2 seconds)
+		setInterval(injectMetadata, 2000);
+		
+		// Inject as a script tag in head for persistence across page reloads
+		const scriptId = '__agent_metadata_injector';
+		let existingScript = document.getElementById(scriptId);
+		if (existingScript) {{
+			existingScript.remove();
+		}}
+		const scriptTag = document.createElement('script');
+		scriptTag.id = scriptId;
+		const metadataJson = JSON.stringify(METADATA);
+		scriptTag.textContent = `(function(){{try{{const s=localStorage.getItem('__agentMetadata');window.__agentMetadata=s?JSON.parse(s):{json.dumps({"model": model_name, "provider": provider_name, "agentFramework": "browser-use"})};}}catch(e){{window.__agentMetadata={json.dumps({"model": model_name, "provider": provider_name, "agentFramework": "browser-use"})};}}function i(){{try{{const s=localStorage.getItem('__agentMetadata');if(s){{window.__agentMetadata=JSON.parse(s);}}}}catch(e){{}}window.__agentMetadata=window.__agentMetadata||{json.dumps({"model": model_name, "provider": provider_name, "agentFramework": "browser-use"})};}}i();if(document.readyState==='loading'){{document.addEventListener('DOMContentLoaded',i);}}setInterval(i,2000);}})();`;
+		if (document.head) {{
+			document.head.appendChild(scriptTag);
+		}} else {{
+			document.addEventListener('DOMContentLoaded', function() {{
+				document.head.appendChild(scriptTag);
+			}});
+		}}
+	}})();
 	"""
 	
 	try:
@@ -412,11 +621,54 @@ async def _run_agent(args: argparse.Namespace) -> int:
 		if browser_instance:
 			try:
 				await browser_instance.execute_script(metadata_script)
+				if args.verbose:
+					logging.info('Injected metadata script before agent run')
 			except Exception as e:
 				if args.verbose:
 					logging.debug('Could not inject metadata/cost tracking script: %s', e)
 		
+		# Also inject after delays to catch post-navigation
+		async def delayed_injection():
+			# Inject multiple times at different intervals to ensure it sticks
+			delays = [2, 5, 10, 20]
+			for i, delay in enumerate(delays):
+				if i == 0:
+					await asyncio.sleep(delay)
+				else:
+					await asyncio.sleep(delay - delays[i-1])  # Sleep for the difference
+				if browser_instance:
+					try:
+						await browser_instance.execute_script(metadata_script)
+						# Verify it was stored
+						verification = await browser_instance.evaluate("""
+							(() => {
+								try {
+									const stored = localStorage.getItem('__agentMetadata');
+									return stored ? 'stored' : 'not stored';
+								} catch(e) {
+									return 'error: ' + e.message;
+								}
+							})()
+						""")
+						if args.verbose:
+							logging.info(f'Injected metadata after {delay}s delay. Verification: {verification}')
+					except Exception as e:
+						if args.verbose:
+							logging.debug(f'Could not inject metadata after {delay}s delay: %s', e)
+		
+		# Start delayed injection in background
+		asyncio.create_task(delayed_injection())
+		
 		history = await agent.run(max_steps=args.max_steps)
+		
+		# Inject metadata again after agent has finished navigating and running
+		# This ensures it's available even if the initial injection was lost
+		if browser_instance:
+			try:
+				await browser_instance.execute_script(metadata_script)
+			except Exception as e:
+				if args.verbose:
+					logging.debug('Could not re-inject metadata after agent run: %s', e)
 	except ValueError as exc:
 		# Commonly raised when the chosen LLM requires API keys.
 		logging.error(str(exc))

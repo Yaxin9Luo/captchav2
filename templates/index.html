@@ -102,6 +102,61 @@
         };
     </script>
     
+    <!-- Agent metadata injection point - will be populated by browser automation -->
+    <script>
+        // Initialize agent metadata from localStorage if available
+        // This ensures metadata persists across page reloads
+        (function() {
+            function loadMetadata() {
+                try {
+                    const stored = localStorage.getItem('__agentMetadata');
+                    if (stored) {
+                        const parsed = JSON.parse(stored);
+                        window.__agentMetadata = parsed;
+                        console.log('Loaded agent metadata from localStorage on page load:', parsed);
+                        return;
+                    }
+                } catch(e) {
+                    console.warn('Could not load metadata from localStorage:', e);
+                }
+                // Fallback: initialize empty object
+                if (!window.__agentMetadata) {
+                    window.__agentMetadata = {
+                        model: null,
+                        provider: null,
+                        agentFramework: null
+                    };
+                }
+            }
+            
+            // Load immediately
+            loadMetadata();
+            
+            // Also load on DOMContentLoaded
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', loadMetadata);
+            }
+            
+            // Re-check periodically (every 1 second for faster updates)
+            setInterval(function() {
+                try {
+                    const stored = localStorage.getItem('__agentMetadata');
+                    if (stored) {
+                        const parsed = JSON.parse(stored);
+                        if (!window.__agentMetadata || 
+                            window.__agentMetadata.model !== parsed.model ||
+                            window.__agentMetadata.provider !== parsed.provider) {
+                            window.__agentMetadata = parsed;
+                            console.log('Updated agent metadata from localStorage:', parsed);
+                        }
+                    }
+                } catch(e) {
+                    // Ignore errors
+                }
+            }, 1000);
+        })();
+    </script>
+    
     <script src="/static/js/script.js"></script>
 </body>
 </html> 

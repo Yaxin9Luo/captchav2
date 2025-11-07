@@ -7,7 +7,7 @@ full-videos/
 30fps_videos/
 inflevel_lab.tar.gz
 *.log
-benchmark_results.json
+benchmark_results_old.json
 .env
 .venv/
 extract_frames.py
@@ -15,3 +15,5 @@ extracted_frames/
 .DS_Store
 runs/
 CONTEXT_HISTORY.md
+benchmark_results.json
+*.csv

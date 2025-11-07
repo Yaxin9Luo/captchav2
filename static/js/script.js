@@ -2113,13 +2113,48 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 
                 // Get model and provider metadata if available
+                // First try window.__agentMetadata, then fallback to localStorage
                 let model_name = null;
                 let provider_name = null;
                 let agent_framework = null;
+                
+                // Try to get from window first
                 if (window.__agentMetadata) {
                     model_name = window.__agentMetadata.model || null;
                     provider_name = window.__agentMetadata.provider || null;
                     agent_framework = window.__agentMetadata.agentFramework || null;
+                }
+                
+                // Fallback to localStorage if window doesn't have it
+                if (!model_name && !provider_name) {
+                    try {
+                        const stored = localStorage.getItem('__agentMetadata');
+                        if (stored) {
+                            const metadata = JSON.parse(stored);
+                            model_name = metadata.model || null;
+                            provider_name = metadata.provider || null;
+                            agent_framework = metadata.agentFramework || null;
+                            // Also set it on window for future use
+                            window.__agentMetadata = metadata;
+                        }
+                    } catch(e) {
+                        console.warn('Could not read metadata from localStorage:', e);
+                    }
+                }
+                
+                // Debug logging (can be removed in production)
+                if (model_name || provider_name) {
+                    console.log('Recording benchmark result with metadata:', {
+                        model: model_name,
+                        provider: provider_name,
+                        agent_framework: agent_framework,
+                        source: window.__agentMetadata ? 'window' : 'localStorage'
+                    });
+                } else {
+                    console.warn('No agent metadata available when recording benchmark result', {
+                        hasWindowMetadata: !!window.__agentMetadata,
+                        localStorageValue: localStorage.getItem('__agentMetadata')
+                    });
                 }
                 
                 recordBenchmarkResult({
@@ -2129,10 +2164,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     correct_answer: data.correct_answer,
                     correct: data.correct,
                     elapsed_time: answerData.elapsed_time,
-                    cost: cost_per_puzzle !== null ? cost_per_puzzle : undefined,
-                    model: model_name || undefined,
-                    provider: provider_name || undefined,
-                    agent_framework: agent_framework || undefined
+                    ...(cost_per_puzzle !== null && { cost: cost_per_puzzle }),
+                    // Don't include model/provider/agent_framework here - let recordBenchmarkResult add them from metadata
                 });
 
                 // Reset custom submit buttons (including jigsaw) before loading new puzzle
@@ -2216,17 +2249,38 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         // Ensure model/provider metadata is included if available from agent metadata
-        if (window.__agentMetadata) {
-            if (result.model === undefined && window.__agentMetadata.model) {
-                result.model = window.__agentMetadata.model;
-            }
-            if (result.provider === undefined && window.__agentMetadata.provider) {
-                result.provider = window.__agentMetadata.provider;
-            }
-            if (result.agent_framework === undefined && window.__agentMetadata.agentFramework) {
-                result.agent_framework = window.__agentMetadata.agentFramework;
+        // Check window first, then localStorage as fallback
+        let metadata = window.__agentMetadata;
+        if (!metadata || (!metadata.model && !metadata.provider)) {
+            try {
+                const stored = localStorage.getItem('__agentMetadata');
+                if (stored) {
+                    metadata = JSON.parse(stored);
+                    window.__agentMetadata = metadata; // Cache it
+                    console.log('Loaded metadata from localStorage:', metadata);
+                }
+            } catch(e) {
+                console.warn('Could not read metadata from localStorage:', e);
             }
         }
+        
+        // Always set metadata if available (overwrite any existing values)
+        if (metadata) {
+            if (metadata.model) {
+                result.model = metadata.model;
+            }
+            if (metadata.provider) {
+                result.provider = metadata.provider;
+            }
+            if (metadata.agentFramework) {
+                result.agent_framework = metadata.agentFramework;
+            }
+        } else {
+            console.warn('No metadata available in recordBenchmarkResult. window.__agentMetadata:', window.__agentMetadata, 'localStorage:', localStorage.getItem('__agentMetadata'));
+        }
+        
+        // Debug: Log what we're sending
+        console.log('Sending benchmark result:', JSON.stringify(result, null, 2));
 
         fetch('/api/benchmark_results', {
             method: 'POST',

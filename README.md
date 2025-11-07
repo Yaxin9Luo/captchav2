@@ -37,6 +37,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 uv sync
 
 # Run the application
+# export BENCHMARK_RESULTS_FILE="results_{model}_{timestamp}.json" (if you want to change result file's name)
 uv run app.py
 
 ### Use uv to run code so you do not have to activate virtual env everytime.

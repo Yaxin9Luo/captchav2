@@ -6,7 +6,7 @@ import csv
 
 CATEGORY_MAP = {
     "Overall": ["Overall Pass Rate"],
-    # You can define sets, e.g. "Vision-hard": ["Adversarial","Deformation","Squiggle"]
+    # You can define sets, e.g. "Vision-hard": ["Squiggle", "Shadow_Plausible"]
 }
 
 def get_results_path():
@@ -147,7 +147,7 @@ def table_html(df):
             font-size: 14px;
           }
           table.lb thead {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
             color: white;
           }
           table.lb th {
@@ -182,10 +182,10 @@ def table_html(df):
             font-weight: 700;
             font-size: 14px;
           }
-          .rank-1 { background: #ffd700; color: #000; }
-          .rank-2 { background: #c0c0c0; color: #000; }
-          .rank-3 { background: #cd7f32; color: #fff; }
-          .rank-other { background: #f3f4f6; color: #6b7280; }
+          .rank-1 { background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%); color: #000; box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4); }
+          .rank-2 { background: linear-gradient(135deg, #c0c0c0 0%, #e8e8e8 100%); color: #000; box-shadow: 0 2px 8px rgba(192, 192, 192, 0.4); }
+          .rank-3 { background: linear-gradient(135deg, #cd7f32 0%, #e6a55d 100%); color: #fff; box-shadow: 0 2px 8px rgba(205, 127, 50, 0.4); }
+          .rank-other { background: #f1f5f9; color: #64748b; }
           .pass-rate-cell {
             font-weight: 600;
             font-size: 15px;
@@ -208,7 +208,7 @@ def table_html(df):
         rank = i + 1
         rank_class = "rank-1" if rank == 1 else "rank-2" if rank == 2 else "rank-3" if rank == 3 else "rank-other"
         pass_rate = r['Category Pass Rate']
-        pass_rate_color = "#059669" if pass_rate >= 0.7 else "#d97706" if pass_rate >= 0.4 else "#dc2626"
+        pass_rate_color = "#10b981" if pass_rate >= 0.7 else "#f59e0b" if pass_rate >= 0.4 else "#ef4444"
         
         # Format duration and cost
         duration = r.get('Avg Duration (s)', None)
@@ -218,7 +218,7 @@ def table_html(df):
         cost_str = f"${cost:.4f}" if pd.notna(cost) and cost is not None else "N/A"
         
         type_val = r.get('Type', 'Proprietary')
-        type_color = "#10b981" if type_val == "Open source" else "#3b82f6"
+        type_color = "#10b981" if type_val == "Open source" else "#6366f1"
         
         rows.append(f"""
         <tr>
@@ -246,10 +246,10 @@ def table_html(df):
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
         font-size: 14px;
       }}
-      table.lb thead {{
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-      }}
+          table.lb thead {{
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+            color: white;
+          }}
       table.lb th {{
         padding: 16px 20px;
         text-align: left;
@@ -282,10 +282,10 @@ def table_html(df):
         font-weight: 700;
         font-size: 14px;
       }}
-      .rank-1 {{ background: #ffd700; color: #000; }}
-      .rank-2 {{ background: #c0c0c0; color: #000; }}
-      .rank-3 {{ background: #cd7f32; color: #fff; }}
-      .rank-other {{ background: #f3f4f6; color: #6b7280; }}
+      .rank-1 {{ background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%); color: #000; box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4); }}
+      .rank-2 {{ background: linear-gradient(135deg, #c0c0c0 0%, #e8e8e8 100%); color: #000; box-shadow: 0 2px 8px rgba(192, 192, 192, 0.4); }}
+      .rank-3 {{ background: linear-gradient(135deg, #cd7f32 0%, #e6a55d 100%); color: #fff; box-shadow: 0 2px 8px rgba(205, 127, 50, 0.4); }}
+      .rank-other {{ background: #f1f5f9; color: #64748b; }}
       .pass-rate-cell {{
         font-weight: 600;
         font-size: 15px;
@@ -314,15 +314,15 @@ def perf_bar(df):
     d = df.sort_values("Category Pass Rate", ascending=True)
     fig, ax = plt.subplots(figsize=(10, max(4, 0.5*len(d))), facecolor='white', dpi=150)
     
-    # Create gradient colors based on pass rate
+    # Create gradient colors based on pass rate - CAPTCHA themed
     colors = []
     for pass_rate in d["Category Pass Rate"]:
         if pass_rate >= 0.7:
-            colors.append('#10b981')  # green
+            colors.append('#10b981')  # verification green
         elif pass_rate >= 0.4:
-            colors.append('#f59e0b')  # orange
+            colors.append('#f59e0b')  # warning amber
         else:
-            colors.append('#ef4444')  # red
+            colors.append('#ef4444')  # error red
     
     bars = ax.barh(range(len(d)), d["Category Pass Rate"], color=colors, alpha=0.8, edgecolor='white', linewidth=1.5)
     
@@ -410,17 +410,17 @@ def perf_by_type(df_full, model_filter="Models Avg"):
     
     fig, ax = plt.subplots(figsize=(max(12, len(means) * 0.8), 6), facecolor='white', dpi=150)
     
-    # Create gradient colors based on performance
+    # Create gradient colors based on performance - CAPTCHA themed
     colors = []
     for val in means.values:
         if pd.isna(val):
-            colors.append('#9ca3af')  # gray for NaN
+            colors.append('#94a3b8')  # slate gray for NaN
         elif val >= 0.7:
-            colors.append('#10b981')  # green
+            colors.append('#10b981')  # verification green
         elif val >= 0.4:
-            colors.append('#f59e0b')  # orange
+            colors.append('#f59e0b')  # warning amber
         else:
-            colors.append('#ef4444')  # red
+            colors.append('#ef4444')  # error red
     
     bars = ax.bar(range(len(means)), means.values, color=colors, alpha=0.8, edgecolor='white', linewidth=1.5)
     
@@ -477,7 +477,7 @@ def cost_effectiveness_plot(df):
     # Plot points
     if len(proprietary) > 0:
         ax.scatter(proprietary['Category Pass Rate'], proprietary['Avg Cost ($)'], 
-                  c='#3b82f6', s=200, alpha=0.75, edgecolors='white', linewidth=2.5, 
+                  c='#6366f1', s=200, alpha=0.75, edgecolors='white', linewidth=2.5, 
                   label='Proprietary', zorder=3)
         # Add labels for proprietary models
         for idx, row in proprietary.iterrows():
@@ -513,17 +513,17 @@ def cost_effectiveness_plot(df):
     ax.text(df_plot['Category Pass Rate'].min() + x_range * 0.05, 
             df_plot['Avg Cost ($)'].max() - y_range * 0.05,
             '▲ Low Performance\nHigh Cost', 
-            fontsize=12, color='#dc2626', weight='bold', 
+            fontsize=12, color='#ef4444', weight='bold', 
             ha='left', va='top', alpha=0.8,
-            bbox=dict(boxstyle='round,pad=0.5', facecolor='white', alpha=0.8, edgecolor='#dc2626', linewidth=1.5))
+            bbox=dict(boxstyle='round,pad=0.5', facecolor='white', alpha=0.8, edgecolor='#ef4444', linewidth=1.5))
     
     # Bottom-right: High Performance, Low Cost
     ax.text(df_plot['Category Pass Rate'].max() - x_range * 0.05, 
             df_plot['Avg Cost ($)'].min() + y_range * 0.05,
             '▼ High Performance\nLow Cost', 
-            fontsize=12, color='#059669', weight='bold', 
+            fontsize=12, color='#10b981', weight='bold', 
             ha='right', va='bottom', alpha=0.8,
-            bbox=dict(boxstyle='round,pad=0.5', facecolor='white', alpha=0.8, edgecolor='#059669', linewidth=1.5))
+            bbox=dict(boxstyle='round,pad=0.5', facecolor='white', alpha=0.8, edgecolor='#10b981', linewidth=1.5))
     
     # Styling
     ax.set_xlabel("Performance (Pass Rate)", fontsize=14, fontweight='600', color='#374151')
@@ -993,13 +993,13 @@ def app():
         puzzle_cols = [c for c in df.columns if c not in exclude_cols]
         cats = ["Overall"] + puzzle_cols
 
-    with gr.Blocks(title="CAPTCHAv2 Leaderboard", theme=gr.themes.Soft(primary_hue="purple")) as demo:
+    with gr.Blocks(title="CAPTCHAv2 Leaderboard", theme=gr.themes.Soft(primary_hue="indigo")) as demo:
         gr.Markdown("""
         <div style="text-align: center; padding: 30px 0;">
-          <h1 style="font-size: 42px; font-weight: 700; margin: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+          <h1 style="font-size: 42px; font-weight: 700; margin: 0; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
             CAPTCHAv2 Leaderboard
           </h1>
-          <p style="font-size: 16px; color: #6b7280; margin-top: 10px;">
+          <p style="font-size: 16px; color: #64748b; margin-top: 10px;">
             Compare model performance across different CAPTCHA types
           </p>
         </div>
@@ -1009,18 +1009,85 @@ def app():
         with gr.Row():
             with gr.Column(scale=1):
                 gr.Markdown("### 📤 Upload Results")
-                gr.Markdown("""
-                Upload your evaluation results to update the leaderboard.
                 
-                **Supported formats:**
-                - CSV files (with columns: Model, Provider, Agent Framework, puzzle types, etc.)
-                - JSON files (single object or array of objects)
-                - benchmark_results.json files (per-puzzle results - will be automatically converted)
+                # Main accordion for the entire guide
+                with gr.Accordion("📖 Step-by-Step Guide to Submit Results", open=False):
+                    # Step 1: Run Evaluation Protocol
+                    with gr.Accordion("Step 1: Run the Evaluation Protocol", open=False):
+                        gr.Markdown("""
+                        **Option A: Using browser-use Agent Framework**
+                        
+                        1. Start the CAPTCHA server:
+                           ```bash
+                           python app.py
+                           ```
+                           The server will run on `http://127.0.0.1:7860`
+                        
+                        2. Run the browser-use agent evaluation (default is their in house model BU1.0):
+                           ```bash
+                           python -m agent_frameworks.browseruse_cli \\
+                             --url http://127.0.0.1:7860 \\
+                             --llm browser-use \\
+                           ```
+                           Or with a different LLM:
+                           ```bash
+                           python -m agent_frameworks.browseruse_cli \\
+                             --url http://127.0.0.1:7860 \\
+                             --llm openai \\
+                             --model gpt-4o 
+                           ```
+                        
+                        3. The evaluation will automatically save results to `benchmark_results.json` in the project root.
+                           Each puzzle attempt is logged as a JSON object with fields:
+                           - `puzzle_type`, `puzzle_id`, `user_answer`, `correct_answer`, `correct`
+                           - `elapsed_time`, `timestamp`
+                           - `model`, `provider`, `agent_framework` 
+                        
+                        **Option B: Using Other Agent Frameworks**
+                        
+                        Follow your framework's evaluation protocol. Ensure results are saved in `benchmark_results.json` format
+                        (JSONL: one JSON object per line) with the same field structure.
+                        """)
+                    
+                    # Step 2: Convert Results
+                    with gr.Accordion("Step 2: Convert Results to CSV Format", open=False):
+                        gr.Markdown("""
+                        **Method 1:  Convert to CSV Format (Recommended)**
+                        
+                        Use the provided conversion script (`convert_benchmark_to_csv.py` in the project root):
+                        ```bash
+                        python convert_benchmark_to_csv.py benchmark_results.json leaderboard/results.csv
+                        ```
+                        
+                        **Method 2: Directly Upload to Leaderboard (Auto-conversion)**
+                        
+                        You can upload `benchmark_results.json` directly here. The system will automatically handle all.
+                        
+                        Optionally provide metadata below if auto-detection fails:
+                        - Model Name (e.g., "gpt-4", "claude-3-sonnet", "bu-1-0")
+                        - Provider (e.g., "OpenAI", "Anthropic", "browser-use")
+                        - Agent Framework (e.g., "browser-use", "crewai")
+                        """)
+                    
+                    # Step 3: Upload Results
+                    with gr.Accordion("Step 3: Upload Results", open=False):
+                        gr.Markdown("""
+                        **Supported file formats:**
+                        - ✅ `benchmark_results.json` - Per-puzzle results (JSONL format) 
+                        - ✅ `results.csv` - Aggregated results  **Recommended**
+                        - ✅ JSON files - Single object or array of aggregated results
+                        
+                        **File format requirements:**
+                        
+                        For `benchmark_results.json` (per-puzzle format):
+                        ```json
+                        {"puzzle_type": "Dice_Count", "puzzle_id": "dice1.png", "user_answer": "24", "correct_answer": 24, "correct": true, "elapsed_time": "12.5", "timestamp": "2025-01-01T00:00:00Z", "model": "bu-1-0", "provider": "browser-use", "agent_framework": "browser-use"}
+                        ```
+                        
+                        For CSV (aggregated format):
+                        - Required columns: `Model`, `Provider`, `Agent Framework`, `Type`, `Overall Pass Rate` , `Avg Duration (s)`, `Avg Cost ($)`, and puzzle type columns (e.g., `Dice_Count`, `Mirror`, etc.)                
+                        """)
                 
-                **Note:** Results from browser-use agents should be uploaded after running evaluations via `agent_frameworks/`.
-                
-                **For benchmark_results.json files:** Optionally provide model metadata below (or leave blank for auto-detection).
-                """)
                 file_upload = gr.File(
                     label="Upload Results File",
                     file_types=[".csv", ".json"],

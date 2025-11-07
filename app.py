@@ -23,14 +23,14 @@ recent_types = []
 MAX_RECENT_TYPES = 5
 
 PUZZLE_TYPE_SEQUENCE = [
-    # 'Dice_Count',
+    'Dice_Count',
     # 'Shadow_Plausible',
     # 'Mirror',
     # 'Squiggle',
     # 'Color_Cipher',
     # 'Color_Counting',
-    'Hole_Counting',
-    'Rotation_Match',
+    # 'Hole_Counting',
+    # 'Rotation_Match',
     # 'Trajectory_Recovery',
     # 'Spooky_Size',
     # 'Spooky_Circle',
@@ -63,6 +63,19 @@ COLOR_SYMBOL_POOL = [
     ("⬜", "white"),
 ]
 
+CURRENT_AGENT_METADATA: dict[str, str] = {}
+
+# Benchmark results file configuration
+# Can be set via environment variable BENCHMARK_RESULTS_FILE
+# Supports placeholders: {model}, {provider}, {framework}, {timestamp}, {date}
+# Examples:
+#   - "benchmark_results.json" (default)
+#   - "results_{model}_{timestamp}.json"
+#   - "benchmark_{date}.json"
+BENCHMARK_RESULTS_FILE_PATTERN = os.environ.get(
+    'BENCHMARK_RESULTS_FILE', 
+    'benchmark_results.json'
+)
 
 def generate_color_cipher(config: dict) -> dict:
     """Create a unique Color Cipher puzzle definition."""
@@ -2645,22 +2658,71 @@ def check_answer():
 
 @app.route('/api/benchmark_results', methods=['POST'])
 def record_benchmark():
-    data = request.json
-    
+    data = request.json or {}
+    if not isinstance(data, dict):
+        return jsonify({'status': 'error', 'message': 'Invalid benchmark result payload'}), 400
+
+    # Merge in stored metadata if fields are missing
+    if CURRENT_AGENT_METADATA:
+        if 'model' not in data and CURRENT_AGENT_METADATA.get('model'):
+            data['model'] = CURRENT_AGENT_METADATA['model']
+        if 'provider' not in data and CURRENT_AGENT_METADATA.get('provider'):
+            data['provider'] = CURRENT_AGENT_METADATA['provider']
+        if 'agent_framework' not in data and CURRENT_AGENT_METADATA.get('agent_framework'):
+            data['agent_framework'] = CURRENT_AGENT_METADATA['agent_framework']
+        if 'agentFramework' not in data:
+            camel_framework = CURRENT_AGENT_METADATA.get('agentFramework') or CURRENT_AGENT_METADATA.get('agent_framework')
+            if camel_framework:
+                data['agentFramework'] = camel_framework
+
     # Add timestamp if not provided
+    from datetime import datetime
     if 'timestamp' not in data:
-        from datetime import datetime
         data['timestamp'] = datetime.now().isoformat()
-    
+
     # In a real system, you would save this data to a database
     # For this example, we'll just print it to the console
     print(f"Benchmark results: {data}")
+
+    # Determine output filename based on pattern
+    now = datetime.now()
     
-    # You could store this in a log file as well
-    with open('benchmark_results.json', 'a') as f:
-        f.write(json.dumps(data) + '\n')
+    # Extract metadata for filename substitution
+    model_name = data.get('model', 'unknown').replace('/', '_').replace('\\', '_')
+    provider = data.get('provider', 'unknown').replace('/', '_').replace('\\', '_')
+    framework = data.get('agent_framework', data.get('agentFramework', 'unknown')).replace('/', '_').replace('\\', '_')
+    timestamp_str = now.strftime('%Y%m%d_%H%M%S')
+    date_str = now.strftime('%Y%m%d')
     
-    return jsonify({'status': 'success'})
+    # Replace placeholders in filename pattern
+    filename = BENCHMARK_RESULTS_FILE_PATTERN.format(
+        model=model_name,
+        provider=provider,
+        framework=framework,
+        timestamp=timestamp_str,
+        date=date_str
+    )
+    
+    # Ensure filename ends with .json if no extension
+    if not filename.endswith(('.json', '.jsonl', '.txt')):
+        filename += '.json'
+    
+    # Store results to file
+    try:
+        with open(filename, 'a') as f:
+            f.write(json.dumps(data) + '\n')
+        print(f"Results saved to: {filename}")
+    except Exception as e:
+        print(f"Error writing to {filename}: {e}")
+        # Fallback to default filename
+        try:
+            with open('benchmark_results.json', 'a') as f:
+                f.write(json.dumps(data) + '\n')
+            print("Results saved to fallback file: benchmark_results.json")
+        except Exception as fallback_error:
+            print(f"Error writing to fallback file: {fallback_error}")
+
+    return jsonify({'status': 'success', 'filename': filename})
 
 @app.route('/api/types', methods=['GET'])
 def get_types():
@@ -2673,6 +2735,32 @@ def get_types():
 def get_puzzle_types():
     """Get available CAPTCHA types (for eval scripts compatibility)"""
     return jsonify(get_captcha_types())
+
+@app.route('/api/agent_metadata', methods=['POST'])
+def update_agent_metadata():
+    """Store the latest agent metadata so benchmark results can reference it."""
+    payload = request.json or {}
+    if not isinstance(payload, dict):
+        return jsonify({'status': 'error', 'message': 'Invalid metadata payload'}), 400
+
+    normalized: dict[str, str] = {}
+    model_value = payload.get('model')
+    provider_value = payload.get('provider')
+    framework_value = payload.get('agent_framework') or payload.get('agentFramework')
+
+    if isinstance(model_value, str) and model_value.strip():
+        normalized['model'] = model_value.strip()
+    if isinstance(provider_value, str) and provider_value.strip():
+        normalized['provider'] = provider_value.strip()
+    if isinstance(framework_value, str) and framework_value.strip():
+        normalized['agent_framework'] = framework_value.strip()
+        normalized['agentFramework'] = normalized['agent_framework']
+
+    global CURRENT_AGENT_METADATA
+    CURRENT_AGENT_METADATA.clear()
+    CURRENT_AGENT_METADATA.update(normalized)
+
+    return jsonify({'status': 'success', 'metadata': CURRENT_AGENT_METADATA})
 
 if __name__ == '__main__':
     # For local development
