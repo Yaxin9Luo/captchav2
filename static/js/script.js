@@ -2102,13 +2102,37 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 updateStats();
+                
+                // Calculate cost per puzzle if agent cost data is available
+                let cost_per_puzzle = null;
+                if (window.__agentCostData && window.__agentCostData.averageCostPerPuzzle !== undefined) {
+                    cost_per_puzzle = window.__agentCostData.averageCostPerPuzzle;
+                } else if (window.__agentCostTracker && window.__agentCostTracker.puzzleCount > 0) {
+                    // Fallback: calculate from tracker if available
+                    cost_per_puzzle = window.__agentCostTracker.getAverageCost();
+                }
+                
+                // Get model and provider metadata if available
+                let model_name = null;
+                let provider_name = null;
+                let agent_framework = null;
+                if (window.__agentMetadata) {
+                    model_name = window.__agentMetadata.model || null;
+                    provider_name = window.__agentMetadata.provider || null;
+                    agent_framework = window.__agentMetadata.agentFramework || null;
+                }
+                
                 recordBenchmarkResult({
                     puzzle_type: currentPuzzle.puzzle_type,
                     puzzle_id: currentPuzzle.puzzle_id,
                     user_answer: answerData.answer,
                     correct_answer: data.correct_answer,
                     correct: data.correct,
-                    elapsed_time: answerData.elapsed_time
+                    elapsed_time: answerData.elapsed_time,
+                    cost: cost_per_puzzle !== null ? cost_per_puzzle : undefined,
+                    model: model_name || undefined,
+                    provider: provider_name || undefined,
+                    agent_framework: agent_framework || undefined
                 });
 
                 // Reset custom submit buttons (including jigsaw) before loading new puzzle
@@ -2184,6 +2208,24 @@ document.addEventListener('DOMContentLoaded', () => {
     function recordBenchmarkResult(result) {
         if (!result.timestamp) {
             result.timestamp = new Date().toISOString();
+        }
+        
+        // Ensure cost is included if available from agent cost tracker
+        if (result.cost === undefined && window.__agentCostData && window.__agentCostData.averageCostPerPuzzle !== undefined) {
+            result.cost = window.__agentCostData.averageCostPerPuzzle;
+        }
+        
+        // Ensure model/provider metadata is included if available from agent metadata
+        if (window.__agentMetadata) {
+            if (result.model === undefined && window.__agentMetadata.model) {
+                result.model = window.__agentMetadata.model;
+            }
+            if (result.provider === undefined && window.__agentMetadata.provider) {
+                result.provider = window.__agentMetadata.provider;
+            }
+            if (result.agent_framework === undefined && window.__agentMetadata.agentFramework) {
+                result.agent_framework = window.__agentMetadata.agentFramework;
+            }
         }
 
         fetch('/api/benchmark_results', {

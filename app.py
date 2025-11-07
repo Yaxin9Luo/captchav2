@@ -2555,11 +2555,16 @@ def check_answer():
             return jsonify({'error': 'Invalid answer format for Color_Cipher'}), 400
     else:
         # For other types, compare as strings (case insensitive)
-        correct_answer = ground_truth[puzzle_id].get('answer')
+        # Get the appropriate answer field based on puzzle type
+        if puzzle_type == 'Dice_Count':
+            answer_key = 'sum'
+        else:
+            answer_key = 'answer'
+        correct_answer = ground_truth[puzzle_id].get(answer_key)
         is_correct = str(user_answer).lower() == str(correct_answer).lower()
         correct_answer_info = correct_answer
     
-    # Get the appropriate answer field based on puzzle type
+    # Get the appropriate answer field for response payload
     if puzzle_type == 'Dice_Count':
         answer_key = 'sum'
     else:
@@ -2663,6 +2668,11 @@ def get_types():
     return jsonify({
         'types': get_captcha_types()
     })
+
+@app.route('/api/puzzle_types', methods=['GET'])
+def get_puzzle_types():
+    """Get available CAPTCHA types (for eval scripts compatibility)"""
+    return jsonify(get_captcha_types())
 
 if __name__ == '__main__':
     # For local development

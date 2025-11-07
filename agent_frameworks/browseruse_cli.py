@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import logging
 import textwrap
 from typing import Callable, Optional
@@ -323,6 +324,34 @@ async def _run_agent(args: argparse.Namespace) -> int:
 		logging.info('Using LLM: %s (actual model: %s)', model_info, actual_model)
 	else:
 		logging.info('Using LLM: %s', model_info)
+	
+	# Extract model name and provider for metadata injection
+	# Get model name
+	model_name = args.model if args.model else None
+	if not model_name:
+		if llm_name == 'browser-use':
+			model_name = 'ChatBrowserUse (fast)' if args.fast else 'ChatBrowserUse (standard)'
+		else:
+			defaults = {
+				'openai': 'gpt-4.1-mini',
+				'anthropic': 'claude-3-7-sonnet-20250219',
+				'google': 'gemini-2.0-flash',
+				'groq': 'llama-3.1-70b-versatile',
+				'azure-openai': None,
+			}
+			model_name = defaults.get(llm_name, 'default')
+		if actual_model:
+			# Use actual model if available
+			if isinstance(actual_model, str):
+				model_name = actual_model.split('(')[0].strip() if '(' in actual_model else actual_model
+	
+	# Get provider name
+	provider_name = llm_name.title()
+	if llm_name == 'browser-use':
+		provider_name = 'Browser Use'
+	elif llm_name == 'azure-openai':
+		provider_name = 'Azure OpenAI'
+	
 	browser = _create_browser(args)
 	task = _build_task_prompt(args.url, args.limit)
 
@@ -346,7 +375,47 @@ async def _run_agent(args: argparse.Namespace) -> int:
 	if args.verbose:
 		logging.getLogger('browser_use').setLevel(logging.DEBUG)
 
+	# Track cost incrementally
+	previous_cost = 0.0
+	puzzle_count = 0
+	
+	# Inject cost tracking and metadata script into the browser page
+	# This will allow JavaScript to access cost data and model/provider info
+	metadata_script = f"""
+	window.__agentMetadata = {{
+		model: {json.dumps(model_name)},
+		provider: {json.dumps(provider_name)},
+		agentFramework: "browser-use"
+	}};
+	window.__agentCostTracker = {{
+		costs: [],
+		totalCost: 0,
+		puzzleCount: 0,
+		addCost: function(cost) {{
+			this.costs.push(cost);
+			this.totalCost += cost;
+			this.puzzleCount += 1;
+		}},
+		getAverageCost: function() {{
+			return this.puzzleCount > 0 ? this.totalCost / this.puzzleCount : 0;
+		}},
+		getCurrentCost: function() {{
+			return this.totalCost;
+		}}
+	}};
+	"""
+	
 	try:
+		# Initialize cost tracking and metadata in browser before running agent
+		# Access browser from agent or use the browser instance we created
+		browser_instance = browser if browser else (getattr(agent, 'browser', None) if hasattr(agent, 'browser') else None)
+		if browser_instance:
+			try:
+				await browser_instance.execute_script(metadata_script)
+			except Exception as e:
+				if args.verbose:
+					logging.debug('Could not inject metadata/cost tracking script: %s', e)
+		
 		history = await agent.run(max_steps=args.max_steps)
 	except ValueError as exc:
 		# Commonly raised when the chosen LLM requires API keys.
@@ -362,8 +431,66 @@ async def _run_agent(args: argparse.Namespace) -> int:
 	else:
 		print('\nAgent did not produce a final summary. Inspect history for details.')
 
+	# Calculate and log cost information
+	total_cost = 0.0
+	average_cost_per_puzzle = 0.0
+	
 	if history.usage and history.usage.total_cost is not None:
-		logging.info('Approximate token cost: %s', history.usage.total_cost)
+		total_cost = float(history.usage.total_cost)
+		logging.info('Total token cost: $%.6f', total_cost)
+		
+		# Try to get puzzle count from browser context
+		browser_instance = browser if browser else (getattr(agent, 'browser', None) if hasattr(agent, 'browser') else None)
+		if browser_instance:
+			try:
+				puzzle_count_result = await browser_instance.evaluate("""
+					(() => {
+						if (window.benchmarkStats && window.benchmarkStats.total) {
+							return window.benchmarkStats.total;
+						}
+						return 0;
+					})()
+				""")
+				if puzzle_count_result and isinstance(puzzle_count_result, (int, float)):
+					puzzle_count = int(puzzle_count_result)
+			except Exception as e:
+				if args.verbose:
+					logging.debug('Could not get puzzle count from browser: %s', e)
+		
+		# Calculate average cost per puzzle
+		if puzzle_count > 0:
+			average_cost_per_puzzle = total_cost / puzzle_count
+			logging.info('Average cost per puzzle: $%.6f (based on %d puzzles)', average_cost_per_puzzle, puzzle_count)
+		else:
+			logging.warning('Could not determine puzzle count, cannot calculate average cost per puzzle')
+		
+		# Inject final cost data and metadata into browser page for JavaScript to use
+		if browser_instance:
+			try:
+				final_data_script = f"""
+				window.__agentCostData = {{
+					totalCost: {total_cost},
+					averageCostPerPuzzle: {average_cost_per_puzzle},
+					puzzleCount: {puzzle_count}
+				}};
+				// Update cost tracker if it exists
+				if (window.__agentCostTracker) {{
+					window.__agentCostTracker.totalCost = {total_cost};
+					window.__agentCostTracker.puzzleCount = {puzzle_count};
+				}}
+				// Ensure metadata is set
+				if (!window.__agentMetadata) {{
+					window.__agentMetadata = {{
+						model: {json.dumps(model_name)},
+						provider: {json.dumps(provider_name)},
+						agentFramework: "browser-use"
+					}};
+				}}
+				"""
+				await browser_instance.execute_script(final_data_script)
+			except Exception as e:
+				if args.verbose:
+					logging.debug('Could not inject final cost/metadata data: %s', e)
 
 	return 0 if successful is not False else 1
 

@@ -13,3 +13,5 @@ benchmark_results.json
 extract_frames.py
 extracted_frames/
 .DS_Store
+runs/
+CONTEXT_HISTORY.md
