@@ -23,7 +23,7 @@ recent_types = []
 MAX_RECENT_TYPES = 5
 
 PUZZLE_TYPE_SEQUENCE = [
-    'Dice_Count',
+    # 'Dice_Count',
     # 'Shadow_Plausible',
     # 'Mirror',
     # 'Squiggle',
@@ -39,11 +39,11 @@ PUZZLE_TYPE_SEQUENCE = [
     # 'Spooky_Text',
     # 'Red_Dot',
     # 'Storyboard_Logic',
-    # 'Jigsaw_Puzzle',
+    # 'Static_Jigsaw',
     # 'Transform_Pipeline',
     # 'Set_Game',
     # 'Dynamic_Jigsaw',
-    # 'Spooky_Jigsaw',
+    'Spooky_Jigsaw',
 ]
 sequential_index = 0
 
@@ -381,7 +381,7 @@ def generate_jigsaw_puzzle(config: dict) -> dict:
         raise ValueError('PIL/Pillow is required for jigsaw puzzle generation')
     
     # Get configuration
-    source_images_dir = config.get("source_images_dir", "captcha_data/Jigsaw_Puzzle/sources")
+    source_images_dir = config.get("source_images_dir", "captcha_data/Static_Jigsaw/sources")
     grid_rows = config.get("grid_rows", random.choice([2, 3]))
     grid_cols = config.get("grid_cols", random.choice([2, 3]))
     piece_size = config.get("piece_size", 150)
@@ -401,7 +401,7 @@ def generate_jigsaw_puzzle(config: dict) -> dict:
         # Try to find source images
         source_path = os.path.join(source_images_dir)
         if not os.path.exists(source_path):
-            source_path = "captcha_data/Jigsaw_Puzzle"
+            source_path = "captcha_data/Static_Jigsaw"
         
         source_images = []
         if os.path.exists(source_path):
@@ -1717,7 +1717,7 @@ def get_puzzle():
             "prompt",
             "Reorder the images to show the story in the correct causal sequence"
         )
-    elif puzzle_type == "Jigsaw_Puzzle":
+    elif puzzle_type == "Static_Jigsaw":
         prompt = ground_truth[selected_puzzle].get(
             "prompt",
             "Drag the puzzle pieces to complete the jigsaw puzzle"
@@ -1764,7 +1764,7 @@ def get_puzzle():
         input_type = "trajectory_recovery_select"
     elif puzzle_type == "Storyboard_Logic":
         input_type = "storyboard_logic"
-    elif puzzle_type == "Jigsaw_Puzzle":
+    elif puzzle_type == "Static_Jigsaw":
         input_type = "jigsaw_puzzle"
     elif puzzle_type == "Transform_Pipeline":
         input_type = "transform_pipeline_select"
@@ -1982,7 +1982,7 @@ def get_puzzle():
             "images": [f'/captcha_data/{puzzle_type}/{img}' for img in images],
             "answer": ground_truth[selected_puzzle].get("answer", [])
         }
-    elif puzzle_type == "Jigsaw_Puzzle":
+    elif puzzle_type == "Static_Jigsaw":
         # Check if we should generate a random puzzle or use ground truth
         use_generation = ground_truth.get("config", {}).get("generate_random", True)
         
@@ -2025,7 +2025,7 @@ def get_puzzle():
         reference_image = ground_truth[selected_puzzle].get("image")
         
         if not pieces or not correct_positions:
-            return jsonify({'error': f'Invalid Jigsaw_Puzzle data: {selected_puzzle}'}), 500
+            return jsonify({'error': f'Invalid Static_Jigsaw data: {selected_puzzle}'}), 500
 
         additional_data = {
             "pieces": [f'/captcha_data/{puzzle_type}/{piece}' for piece in pieces],
@@ -2085,7 +2085,7 @@ def get_puzzle():
         prompt = ground_truth[selected_puzzle].get("prompt", "Solve the CAPTCHA puzzle")
 
     image_path = None
-    if puzzle_type not in ("Rotation_Match", "Shadow_Plausible", "Mirror",  "Squiggle", "Spooky_Circle_Grid", "Spooky_Circle_Grid_Direction", "Spooky_Shape_Grid", "Color_Cipher", "Color_Counting", "Hole_Counting", "Trajectory_Recovery", "Storyboard_Logic", "Jigsaw_Puzzle", "Transform_Pipeline", "Set_Game", "Dynamic_Jigsaw", "Spooky_Jigsaw"):
+    if puzzle_type not in ("Rotation_Match", "Shadow_Plausible", "Mirror",  "Squiggle", "Spooky_Circle_Grid", "Spooky_Circle_Grid_Direction", "Spooky_Shape_Grid", "Color_Cipher", "Color_Counting", "Hole_Counting", "Trajectory_Recovery", "Storyboard_Logic", "Static_Jigsaw", "Transform_Pipeline", "Set_Game", "Dynamic_Jigsaw", "Spooky_Jigsaw"):
         image_path = f'/captcha_data/{puzzle_type}/{selected_puzzle}'
         if not media_type:
             media_type = "image"
@@ -2148,13 +2148,13 @@ def check_answer():
 
     
     # Validate input
-    # For Jigsaw_Puzzle, allow None/empty answers to be handled gracefully (marked as incorrect)
-    if not puzzle_id or (user_answer is None and puzzle_type != 'Jigsaw_Puzzle'):
+    # For Static_Jigsaw, allow None/empty answers to be handled gracefully (marked as incorrect)
+    if not puzzle_id or (user_answer is None and puzzle_type != 'Static_Jigsaw'):
         return jsonify({'error': 'Missing puzzle_id or answer'}), 400
     
     ground_truth = load_ground_truth(puzzle_type)
     
-    if puzzle_type not in ('Color_Cipher', 'Red_Dot', 'Spooky_Size', 'Jigsaw_Puzzle', 'Transform_Pipeline') and puzzle_id not in ground_truth:
+    if puzzle_type not in ('Color_Cipher', 'Red_Dot', 'Spooky_Size', 'Static_Jigsaw', 'Transform_Pipeline') and puzzle_id not in ground_truth:
         return jsonify({'error': 'Invalid puzzle ID'}), 400
     
     # Get correct answer based on puzzle type
@@ -2321,7 +2321,7 @@ def check_answer():
             correct_answer_info = correct_order
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid answer format for Storyboard_Logic'}), 400
-    elif puzzle_type == 'Jigsaw_Puzzle' or puzzle_type == 'Dynamic_Jigsaw' or puzzle_type == 'Spooky_Jigsaw':
+    elif puzzle_type == 'Static_Jigsaw' or puzzle_type == 'Dynamic_Jigsaw' or puzzle_type == 'Spooky_Jigsaw':
         try:
             # Check if this is a generated puzzle (stored in active_jigsaw_puzzles)
             puzzle_state = active_jigsaw_puzzles.get(puzzle_id)
@@ -2430,7 +2430,7 @@ def check_answer():
             import traceback
             print(f"Jigsaw validation error: {str(e)}")
             print(traceback.format_exc())
-            return jsonify({'error': f'Invalid answer format for Jigsaw_Puzzle: {str(e)}'}), 400
+            return jsonify({'error': f'Invalid answer format for Static_Jigsaw: {str(e)}'}), 400
     elif puzzle_type == 'Spooky_Size':
         state = active_spooky_size_puzzles.get(puzzle_id)
         if state is None:
@@ -2610,7 +2610,7 @@ def check_answer():
                 correct_payload = ground_truth[puzzle_id].get(answer_key)
             else:
                 correct_payload = str(correct_answer_info) if correct_answer_info is not None else "Unknown"
-    elif puzzle_type == 'Jigsaw_Puzzle' or puzzle_type == 'Dynamic_Jigsaw' or puzzle_type == 'Spooky_Jigsaw':
+    elif puzzle_type == 'Static_Jigsaw' or puzzle_type == 'Dynamic_Jigsaw' or puzzle_type == 'Spooky_Jigsaw':
         # Format the correct positions as a readable string
         if isinstance(correct_answer_info, list):
             position_strs = []
@@ -2647,11 +2647,11 @@ def check_answer():
         response_body['details'] = correct_answer_info
     if puzzle_type == 'Spooky_Size' and isinstance(correct_answer_info, dict):
         response_body['details'] = correct_answer_info
-    if puzzle_type == 'Jigsaw_Puzzle' and not is_correct:
+    if puzzle_type == 'Static_Jigsaw' and not is_correct:
         # Include debug details for incorrect jigsaw puzzles
         response_body['details'] = {
-            'user_placements': user_answer if puzzle_type == 'Jigsaw_Puzzle' else None,
-            'correct_positions': correct_answer_info if puzzle_type == 'Jigsaw_Puzzle' else None
+            'user_placements': user_answer if puzzle_type == 'Static_Jigsaw' else None,
+            'correct_positions': correct_answer_info if puzzle_type == 'Static_Jigsaw' else None
         }
 
     return jsonify(response_body)

@@ -2303,7 +2303,7 @@ document.addEventListener('DOMContentLoaded', () => {
             Color_Cipher: 3,
             Red_Dot: 4,
             Storyboard_Logic: 3,
-            Jigsaw_Puzzle: 2,
+            Static_Jigsaw: 2,
             Transform_Pipeline: 4,
         };
 
