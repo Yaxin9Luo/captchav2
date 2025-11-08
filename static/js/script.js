@@ -304,6 +304,7 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'hole_counting_select':
             case 'rotation_match_select':
             case 'rhythm_select':
+            case 'backmost_layer_select':
             case 'trajectory_recovery_select':
             case 'set_game_select':
                 setupGridSelection(data);
@@ -1428,6 +1429,33 @@ document.addEventListener('DOMContentLoaded', () => {
             puzzleImageContainer.appendChild(refContainer);
         }
 
+        // For Backmost_Layer, show the reference image above the grid
+        if (data.puzzle_type === 'Backmost_Layer' && data.reference_image) {
+            const refContainer = document.createElement('div');
+            refContainer.className = 'backmost-reference';
+            refContainer.style.textAlign = 'center';
+            refContainer.style.marginBottom = '20px';
+
+            const refLabel = document.createElement('div');
+            refLabel.className = 'backmost-reference-label';
+            refLabel.textContent = 'Reference (backmost shape to find):';
+            refLabel.style.fontSize = '18px';
+            refLabel.style.fontWeight = 'bold';
+            refLabel.style.marginBottom = '10px';
+            refContainer.appendChild(refLabel);
+
+            const refImg = document.createElement('img');
+            refImg.src = data.reference_image;
+            refImg.alt = 'Reference pattern';
+            refImg.style.width = '200px';
+            refImg.style.height = '200px';
+            refImg.style.border = '4px solid #0078ff';
+            refImg.style.borderRadius = '8px';
+            refContainer.appendChild(refImg);
+
+            puzzleImageContainer.appendChild(refContainer);
+        }
+
         // For Trajectory_Recovery, show the movement GIF above the grid
         if (data.puzzle_type === 'Trajectory_Recovery' && data.movement_gif) {
             const gifContainer = document.createElement('div');
@@ -2044,6 +2072,7 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'hole_counting_select':
             case 'rotation_match_select':
             case 'rhythm_select':
+            case 'backmost_layer_select':
             case 'trajectory_recovery_select':
             case 'set_game_select':
                 answerData.answer = selectedGridCells;
