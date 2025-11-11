@@ -900,15 +900,45 @@ def process_uploaded_file(file, model_name=None, provider=None, agent_framework=
     except Exception as e:
         return None, f"Error processing file: {str(e)}"
 
+def clean_nan_values(record):
+    """Convert NaN values to None for proper CSV serialization."""
+    import math
+    cleaned = {}
+    for key, value in record.items():
+        if pd.isna(value) or (isinstance(value, float) and math.isnan(value)):
+            cleaned[key] = None
+        else:
+            cleaned[key] = value
+    return cleaned
+
 def aggregate_runs_to_csv():
     """
     Aggregate all JSON files in runs/ directory into results.csv.
     This consolidates all uploaded evaluation results into a single CSV file.
     Deduplicates records based on (Model, Provider, Agent Framework) combination,
     keeping the most recent entry for each unique combination.
+    Preserves existing records from results.csv that aren't in runs/ directory.
     """
     runs_path = get_runs_path()
     results_path = get_results_path()
+    
+    # First, load existing results.csv to preserve models not in new uploads
+    existing_records_with_time = []
+    if results_path.exists():
+        try:
+            df_existing = load_df(results_path)
+            if len(df_existing) > 0:
+                # Convert existing records to dict format
+                for _, row in df_existing.iterrows():
+                    record = row.to_dict()
+                    # Clean NaN values
+                    record = clean_nan_values(record)
+                    # Use file modification time - 1 day as timestamp (older than new uploads)
+                    # This ensures new uploads take precedence, but existing records are preserved
+                    existing_mtime = results_path.stat().st_mtime - 86400  # 1 day ago
+                    existing_records_with_time.append((existing_mtime, record))
+        except Exception as e:
+            print(f"Warning: Error loading existing results.csv: {e}")
     
     # Gather all JSON files with their modification times
     records_with_time = []
@@ -921,7 +951,10 @@ def aggregate_runs_to_csv():
         except Exception as e:
             print(f"Warning: Skipping invalid JSON file {path}: {e}")
     
-    if not records_with_time:
+    # Combine existing records with new records from runs/
+    all_records_with_time = existing_records_with_time + records_with_time
+    
+    if not all_records_with_time:
         # Create empty CSV with headers
         fixed_metadata = ["Model", "Provider", "Agent Framework", "Type"]
         fixed_metrics = ["Overall Pass Rate", "Avg Duration (s)", "Avg Cost ($)"]
@@ -931,12 +964,12 @@ def aggregate_runs_to_csv():
         return
     
     # Sort by modification time (most recent first)
-    records_with_time.sort(key=lambda x: x[0], reverse=True)
+    all_records_with_time.sort(key=lambda x: x[0], reverse=True)
     
     # Handle legacy column names and infer Type
     legacy_map = {"Notes": "Agent Framework", "Overall": "Overall Pass Rate"}
     processed_records = []
-    for mtime, record in records_with_time:
+    for mtime, record in all_records_with_time:
         for old_key, new_key in legacy_map.items():
             if old_key in record and new_key not in record:
                 record[new_key] = record.pop(old_key)
