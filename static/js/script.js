@@ -305,6 +305,8 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'rotation_match_select':
             case 'rhythm_select':
             case 'backmost_layer_select':
+            case 'shadow_direction_select':
+            case 'global_phase_drift_select':
             case 'trajectory_recovery_select':
             case 'set_game_select':
                 setupGridSelection(data);
@@ -1456,6 +1458,34 @@ document.addEventListener('DOMContentLoaded', () => {
             puzzleImageContainer.appendChild(refContainer);
         }
 
+        // For Shadow_Direction, show the light direction arrow
+        if (data.puzzle_type === 'Shadow_Direction' && data.reference_image) {
+            const refContainer = document.createElement('div');
+            refContainer.className = 'shadow-direction-reference';
+            refContainer.style.textAlign = 'center';
+            refContainer.style.marginBottom = '20px';
+
+            const refLabel = document.createElement('div');
+            refLabel.className = 'shadow-direction-reference-label';
+            refLabel.textContent = 'Light Direction:';
+            refLabel.style.fontSize = '18px';
+            refLabel.style.fontWeight = 'bold';
+            refLabel.style.marginBottom = '10px';
+            refContainer.appendChild(refLabel);
+
+            const refImg = document.createElement('img');
+            refImg.src = data.reference_image;
+            refImg.alt = 'Light direction arrow';
+            refImg.style.width = '200px';
+            refImg.style.height = '200px';
+            refImg.style.border = '4px solid #ffcc00';
+            refImg.style.borderRadius = '8px';
+            refImg.style.backgroundColor = '#f5f5f0';
+            refContainer.appendChild(refImg);
+
+            puzzleImageContainer.appendChild(refContainer);
+        }
+
         // For Trajectory_Recovery, show the movement GIF above the grid
         if (data.puzzle_type === 'Trajectory_Recovery' && data.movement_gif) {
             const gifContainer = document.createElement('div');
@@ -1514,6 +1544,27 @@ document.addEventListener('DOMContentLoaded', () => {
             puzzleImageContainer.appendChild(rulesContainer);
         }
 
+        // For Global_Phase_Drift, show instructions
+        if (data.puzzle_type === 'Global_Phase_Drift') {
+            const instructionsContainer = document.createElement('div');
+            instructionsContainer.className = 'global-phase-drift-instructions';
+            instructionsContainer.style.textAlign = 'center';
+            instructionsContainer.style.marginBottom = '20px';
+            instructionsContainer.style.padding = '15px';
+            instructionsContainer.style.backgroundColor = '#f8f8f8';
+            instructionsContainer.style.border = '2px solid #666';
+            instructionsContainer.style.borderRadius = '8px';
+
+            const instructionsLabel = document.createElement('div');
+            instructionsLabel.textContent = 'Watch the animations carefully - one cell is out of sync with the wave pattern';
+            instructionsLabel.style.fontSize = '16px';
+            instructionsLabel.style.fontWeight = 'bold';
+            instructionsLabel.style.color = '#333';
+            instructionsContainer.appendChild(instructionsLabel);
+
+            puzzleImageContainer.appendChild(instructionsContainer);
+        }
+
         const gridContainer = document.createElement('div');
         gridContainer.className = 'grid-container';
 
@@ -1532,9 +1583,13 @@ document.addEventListener('DOMContentLoaded', () => {
             gridContainer.classList.add('trajectory-recovery-grid');
         }
 
-        const optionImages = data.option_images || [];
+        // For Global_Phase_Drift, use cell_gifs instead of option_images
+        const optionImages = data.puzzle_type === 'Global_Phase_Drift'
+            ? (data.cell_gifs || [])
+            : (data.option_images || []);
+
         if (!optionImages.length) {
-            showError('No spooky grid options available.');
+            showError('No grid options available.');
             return;
         }
 
@@ -2073,6 +2128,8 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'rotation_match_select':
             case 'rhythm_select':
             case 'backmost_layer_select':
+            case 'shadow_direction_select':
+            case 'global_phase_drift_select':
             case 'trajectory_recovery_select':
             case 'set_game_select':
                 answerData.answer = selectedGridCells;
