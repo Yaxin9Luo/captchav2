@@ -2281,6 +2281,7 @@ def check_answer():
     puzzle_id = data.get('puzzle_id')
     user_answer = data.get('answer')
     elapsed_time = float(data.get('elapsed_time', 0))
+    action_sequence = data.get('action_sequence', [])
 
     
     # Validate input
@@ -2807,7 +2808,9 @@ def check_answer():
     response_body = {
         'correct': is_correct,
         'user_answer': user_answer,
-        'correct_answer': correct_payload
+        'correct_answer': correct_payload,
+        'elapsed_time': elapsed_time,
+        'action_sequence': action_sequence
     }
     if status is not None:
         response_body['status'] = status

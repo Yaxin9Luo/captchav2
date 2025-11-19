@@ -1,4 +1,44 @@
 let puzzleStartTime = null;
+let actionSequence = [];
+let timerInterval = null;
+
+// Function to log user actions
+function logAction(actionType, details = {}) {
+    const timestamp = Date.now();
+    const timeSinceStart = puzzleStartTime ? timestamp - puzzleStartTime : 0;
+    actionSequence.push({
+        type: actionType,
+        timestamp: timestamp,
+        timeSinceStart: timeSinceStart,
+        details: details
+    });
+    console.log('Action logged:', actionType, details);
+}
+
+// Function to update elapsed time display
+function updateElapsedTime() {
+    const elapsedTimeEl = document.getElementById('elapsed-time');
+    if (puzzleStartTime && elapsedTimeEl) {
+        const elapsedSeconds = ((Date.now() - puzzleStartTime) / 1000).toFixed(1);
+        elapsedTimeEl.textContent = `${elapsedSeconds}s`;
+    }
+}
+
+// Function to start the timer
+function startTimer() {
+    if (timerInterval) {
+        clearInterval(timerInterval);
+    }
+    timerInterval = setInterval(updateElapsedTime, 100); // Update every 100ms
+}
+
+// Function to stop the timer
+function stopTimer() {
+    if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     const submitBtn = document.getElementById('submit-answer');
@@ -44,6 +84,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (event.key === 'Enter') {
             submitAnswer();
         }
+    });
+
+    // Log text input changes
+    userAnswerInput.addEventListener('input', (event) => {
+        logAction('text_input', { value: event.target.value });
     });
 
     displayDifficultyStars('Dice_Count');
@@ -242,8 +287,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     user_answer: redDotAnswer,
                     correct_answer: data.correct_answer,
                     correct: data.correct,
-                    elapsed_time: answerData.elapsed_time
+                    elapsed_time: data.elapsed_time || answerData.elapsed_time,
+                    action_sequence: data.action_sequence || actionSequence
                 });
+
+                // Stop the timer since puzzle is complete
+                stopTimer();
 
                 setTimeout(loadNewPuzzle, 2000);
             })
@@ -297,6 +346,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 currentPuzzle = data;
                 puzzleStartTime = Date.now();
+                actionSequence = [];
+                logAction('puzzle_loaded', { puzzle_type: data.puzzle_type, puzzle_id: data.puzzle_id });
+                startTimer();
 
                 displayDifficultyStars(data.puzzle_type);
                 puzzlePrompt.textContent = data.prompt || 'Solve the CAPTCHA puzzle';
@@ -407,6 +459,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const areaRect = area.getBoundingClientRect();
             const clickX = event.clientX - areaRect.left;
             const clickY = event.clientY - areaRect.top;
+
+            logAction('red_dot_clicked', { x: clickX, y: clickY, puzzle_type: 'Red_Dot' });
 
             finalizeRedDotAttempt({
                 clicked: true,
@@ -815,11 +869,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 cell.addEventListener('drop', (e) => {
                     e.preventDefault();
                     cell.style.backgroundColor = '#fff';
-                    
+
                     const pieceIndex = parseInt(e.dataTransfer.getData('text/plain'));
                     const row = parseInt(cell.dataset.row);
                     const col = parseInt(cell.dataset.col);
-                    
+
+                    logAction('jigsaw_piece_dropped', { piece_index: pieceIndex, to_row: row, to_col: col });
+
                     // If cell already has a piece, don't replace it
                     if (cell.querySelector('.jigsaw-piece')) {
                         return;
@@ -882,6 +938,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     pieceImg.addEventListener('dragstart', (e) => {
                         e.dataTransfer.setData('text/plain', pieceIndex.toString());
                         e.dataTransfer.effectAllowed = 'move';
+                        logAction('jigsaw_drag_start', { piece_index: pieceIndex, from_cell: cellIndex });
                     });
                     
                     // Allow removing piece by dragging to tray
@@ -1179,12 +1236,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const selectedIndex = bingoSelectedCells.indexOf(index);
         if (selectedIndex !== -1) {
             bingoSelectedCells.splice(selectedIndex, 1);
+            logAction('cell_deselected', { puzzle_type: 'Bingo', cell_index: index });
             if (overlay) {
                 overlay.style.opacity = '0';
             }
             cellElement.style.transform = 'scale(1)';
             cellElement.style.borderColor = '#333';
         } else {
+            logAction('cell_selected', { puzzle_type: 'Bingo', cell_index: index });
             if (bingoSelectedCells.length === 2) {
                 const firstIndex = bingoSelectedCells.shift();
                 const firstCell = document.querySelector(`.grid-cell[data-index="${firstIndex}"]`);
@@ -1314,6 +1373,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const alreadySelected = shadowSelectedCells.includes(index);
         if (alreadySelected) {
             shadowSelectedCells = shadowSelectedCells.filter((idx) => idx !== index);
+            logAction('cell_deselected', { puzzle_type: 'Shadow_Plausible', cell_index: index });
             if (overlay) {
                 overlay.style.opacity = '0';
             }
@@ -1324,6 +1384,7 @@ document.addEventListener('DOMContentLoaded', () => {
             cellElement.style.borderColor = '#333';
         } else {
             shadowSelectedCells.push(index);
+            logAction('cell_selected', { puzzle_type: 'Shadow_Plausible', cell_index: index });
             if (overlay) {
                 overlay.style.opacity = '1';
             }
@@ -1697,6 +1758,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const alreadySelected = selectedGridCells.includes(index);
         if (alreadySelected) {
             selectedGridCells = selectedGridCells.filter((idx) => idx !== index);
+            logAction('cell_deselected', { puzzle_type: currentPuzzle?.puzzle_type, cell_index: index });
             if (overlay) {
                 overlay.style.opacity = '0';
             }
@@ -1707,6 +1769,7 @@ document.addEventListener('DOMContentLoaded', () => {
             cellElement.style.borderColor = '#333';
         } else {
             selectedGridCells.push(index);
+            logAction('cell_selected', { puzzle_type: currentPuzzle?.puzzle_type, cell_index: index });
             if (overlay) {
                 overlay.style.opacity = '1';
             }
@@ -1820,6 +1883,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (squiggleSelectedIndex === index) {
             squiggleSelectedIndex = null;
             optionElement.classList.remove('active');
+            logAction('option_deselected', { puzzle_type: 'Squiggle', option_index: index });
             return;
         }
 
@@ -1830,6 +1894,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         squiggleSelectedIndex = index;
         optionElement.classList.add('active');
+        logAction('option_selected', { puzzle_type: 'Squiggle', option_index: index });
     }
 
     function setupTransformPipelineSelect(data) {
@@ -1961,6 +2026,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (transformPipelineSelectedIndex === index) {
             transformPipelineSelectedIndex = null;
             optionElement.classList.remove('active');
+            logAction('option_deselected', { puzzle_type: 'Transform_Pipeline', option_index: index });
             return;
         }
 
@@ -1971,6 +2037,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         transformPipelineSelectedIndex = index;
         optionElement.classList.add('active');
+        logAction('option_selected', { puzzle_type: 'Transform_Pipeline', option_index: index });
     }
 
     function setupColorCipher(data) {
@@ -2068,6 +2135,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const alreadySelected = mirrorSelectedCells.includes(index);
         if (alreadySelected) {
             mirrorSelectedCells = mirrorSelectedCells.filter((idx) => idx !== index);
+            logAction('cell_deselected', { puzzle_type: 'Mirror', cell_index: index });
             if (overlay) {
                 overlay.classList.remove('active');
             }
@@ -2077,6 +2145,7 @@ document.addEventListener('DOMContentLoaded', () => {
             cellElement.classList.remove('active');
         } else {
             mirrorSelectedCells.push(index);
+            logAction('cell_selected', { puzzle_type: 'Mirror', cell_index: index });
             if (overlay) {
                 overlay.classList.add('active');
             }
@@ -2205,6 +2274,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         answerData.elapsed_time = ((Date.now() - (puzzleStartTime || Date.now())) / 1000).toFixed(2);
 
+        // Log submit action and add action sequence to answer data
+        logAction('submit_answer', { answer: answerData.answer });
+        answerData.action_sequence = actionSequence;
+
         if (submitBtn.style.display !== 'none') {
             submitBtn.disabled = true;
             submitBtn.textContent = 'Processing...';
@@ -2305,14 +2378,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     user_answer: answerData.answer,
                     correct_answer: data.correct_answer,
                     correct: data.correct,
-                    elapsed_time: answerData.elapsed_time,
+                    elapsed_time: data.elapsed_time || answerData.elapsed_time,
+                    action_sequence: data.action_sequence || answerData.action_sequence,
                     ...(cost_per_puzzle !== null && { cost: cost_per_puzzle }),
                     // Don't include model/provider/agent_framework here - let recordBenchmarkResult add them from metadata
                 });
 
                 // Reset custom submit buttons (including jigsaw) before loading new puzzle
                 resetCustomSubmitButtons();
-                
+
+                // Stop the timer since puzzle is complete
+                stopTimer();
+
                 setTimeout(loadNewPuzzle, 2000);
             })
             .catch((error) => {
