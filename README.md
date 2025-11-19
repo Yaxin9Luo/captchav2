@@ -5,15 +5,32 @@ A comprehensive web-based benchmark platform for testing and evaluating various 
 ## Features
 
 - **Multiple CAPTCHA Types**: Support for various puzzle types including:
-  - Dice Count
-  - Shadow Plausible
-  - Mirror
-  - Squiggle (Memory-based)
+  - Backmost Layer
   - Color Cipher
-  - Spooky Circle (various variants)
-  - Deformation
+  - Color Counting
+  - Dice Count
+  - Dynamic Jigsaw
+  - Global Phase Drift
+  - Hole Counting
+  - Map Parity
+  - Mirror
   - Red Dot
-  - Adversarial puzzles
+  - Rhythm
+  - Rotation Match
+  - Set Game
+  - Shadow Direction
+  - Shadow Plausible
+  - Spooky Circle
+  - Spooky Circle Grid
+  - Spooky Jigsaw
+  - Spooky Shape Grid
+  - Spooky Size
+  - Spooky Text
+  - Squiggle (Memory-based)
+  - Static Jigsaw
+  - Storyboard Logic
+  - Trajectory Recovery
+  - Transform Pipeline
 
 - **Real-time Statistics**: Track total puzzles solved, correct answers, and accuracy rate
 - **Difficulty Ratings**: Each puzzle is rated with a difficulty level (1-5 stars)
@@ -107,17 +124,32 @@ captchav2/
 ├── pyproject.toml        # Modern Python project configuration
 ├── Dockerfile            # Docker configuration
 ├── captcha_data/         # CAPTCHA puzzle data files
-│   ├── Adversarial/
+│   ├── Backmost_Layer/
 │   ├── Color_Cipher/
-│   ├── Deformation/
+│   ├── Color_Counting/
 │   ├── Dice_Count/
+│   ├── Dynamic_Jigsaw/
+│   ├── Global_Phase_Drift/
+│   ├── Hole_Counting/
+│   ├── Map_Parity/
 │   ├── Mirror/
 │   ├── Red_Dot/
+│   ├── Rhythm/
+│   ├── Rotation_Match/
+│   ├── Set_Game/
+│   ├── Shadow_Direction/
 │   ├── Shadow_Plausible/
 │   ├── Spooky_Circle/
 │   ├── Spooky_Circle_Grid/
-│   ├── Spooky_Circle_Grid_Direction/
-│   └── Squiggle/
+│   ├── Spooky_Jigsaw/
+│   ├── Spooky_Shape_Grid/
+│   ├── Spooky_Size/
+│   ├── Spooky_Text/
+│   ├── Squiggle/
+│   ├── Static_Jigsaw/
+│   ├── Storyboard_Logic/
+│   ├── Trajectory_Recovery/
+│   └── Transform_Pipeline/
 ├── static/               # Static assets (CSS, JS)
 │   ├── css/
 │   └── js/
