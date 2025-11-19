@@ -31,8 +31,12 @@ PUZZLE_TYPE_SEQUENCE = [
     # 'Color_Counting',
     # 'Hole_Counting',
     # 'Rotation_Match',
+    # 'Rhythm',
+    #'Backmost_Layer',
+    #'Shadow_Direction',
+    'Global_Phase_Drift',
     # 'Trajectory_Recovery',
-    'Spooky_Size',
+    # 'Spooky_Size',
     # 'Spooky_Circle',
     # 'Spooky_Circle_Grid',
     # 'Spooky_Shape_Grid',
@@ -1501,15 +1505,15 @@ def serve_captcha_subdir(captcha_type, subdir, filename):
 @app.route('/api/get_puzzle', methods=['GET'])
 def get_puzzle():
     global recent_types
-    
+
     # Check if we should return a random puzzle from any type
     is_random = request.args.get('random', 'false').lower() == 'true'
-    
+
     # Get all available CAPTCHA types
     captcha_types = get_captcha_types()
     if not captcha_types:
         return jsonify({'error': 'No CAPTCHA types found'}), 404
-    
+
     # Check if we're in debug mode for a specific type
     debug_type = request.args.get('debug_type')
 
@@ -1754,6 +1758,14 @@ def get_puzzle():
         input_type = "hole_counting_select"
     elif puzzle_type == "Rotation_Match":
         input_type = "rotation_match_select"
+    elif puzzle_type == "Rhythm":
+        input_type = "rhythm_select"
+    elif puzzle_type == "Backmost_Layer":
+        input_type = "backmost_layer_select"
+    elif puzzle_type == "Shadow_Direction":
+        input_type = "shadow_direction_select"
+    elif puzzle_type == "Global_Phase_Drift":
+        input_type = "global_phase_drift_select"
     elif puzzle_type == "Spooky_Text":
         input_type = "text"
     elif puzzle_type == "Color_Cipher":
@@ -1951,6 +1963,117 @@ def get_puzzle():
             "grid_size": ground_truth[selected_puzzle].get("grid_size", [4, 4]),
             "answer": ground_truth[selected_puzzle].get("answer", [])
         }
+    elif puzzle_type == "Rhythm":
+        # Load cell pool to map cell IDs to filenames
+        cell_pool_path = os.path.join('captcha_data', puzzle_type, 'cell_pool.json')
+        with open(cell_pool_path) as f:
+            cell_pool = json.load(f)
+
+        cell_ids = ground_truth[selected_puzzle].get("cells", [])
+        reference_cell = ground_truth[selected_puzzle].get("reference_cell")
+        if not cell_ids or not reference_cell:
+            return jsonify({'error': f'Invalid Rhythm data: {selected_puzzle}'}), 500
+
+        # Convert cell IDs to GIF paths
+        cell_images = []
+        for cell_id in cell_ids:
+            if cell_id in cell_pool:
+                cell_images.append(f'/captcha_data/{puzzle_type}/{cell_pool[cell_id]["filename"]}')
+            else:
+                return jsonify({'error': f'Cell not found in pool: {cell_id}'}), 500
+
+        # Get reference GIF
+        if reference_cell in cell_pool:
+            reference_gif = f'/captcha_data/{puzzle_type}/{cell_pool[reference_cell]["filename"]}'
+        else:
+            return jsonify({'error': f'Reference cell not found: {reference_cell}'}), 500
+
+        additional_data = {
+            "reference_gif": reference_gif,
+            "option_images": cell_images,
+            "grid_size": ground_truth[selected_puzzle].get("grid_size", [4, 4]),
+            "answer": ground_truth[selected_puzzle].get("answer", [])
+        }
+    elif puzzle_type == "Backmost_Layer":
+        # Load cell pool to map cell IDs to filenames
+        cell_pool_path = os.path.join('captcha_data', puzzle_type, 'cell_pool.json')
+        with open(cell_pool_path) as f:
+            cell_pool = json.load(f)
+
+        cell_ids = ground_truth[selected_puzzle].get("cells", [])
+        reference_cell = ground_truth[selected_puzzle].get("reference_cell")
+        if not cell_ids or not reference_cell:
+            return jsonify({'error': f'Invalid Backmost_Layer data: {selected_puzzle}'}), 500
+
+        # Convert cell IDs to image paths
+        cell_images = []
+        for cell_id in cell_ids:
+            if cell_id in cell_pool:
+                cell_images.append(f'/captcha_data/{puzzle_type}/{cell_pool[cell_id]["filename"]}')
+            else:
+                return jsonify({'error': f'Cell not found in pool: {cell_id}'}), 500
+
+        # Get reference image
+        if reference_cell in cell_pool:
+            reference_image = f'/captcha_data/{puzzle_type}/{cell_pool[reference_cell]["filename"]}'
+        else:
+            return jsonify({'error': f'Reference cell not found: {reference_cell}'}), 500
+
+        additional_data = {
+            "reference_image": reference_image,
+            "option_images": cell_images,
+            "grid_size": ground_truth[selected_puzzle].get("grid_size", [4, 4]),
+            "answer": ground_truth[selected_puzzle].get("answer", [])
+        }
+    elif puzzle_type == "Shadow_Direction":
+        # Load cell pool to map cell IDs to filenames
+        cell_pool_path = os.path.join('captcha_data', puzzle_type, 'cell_pool.json')
+        with open(cell_pool_path) as f:
+            cell_pool = json.load(f)
+
+        cell_ids = ground_truth[selected_puzzle].get("cells", [])
+        reference_image_file = ground_truth[selected_puzzle].get("reference_image")
+
+        if not cell_ids or not reference_image_file:
+            return jsonify({'error': f'Invalid Shadow_Direction data: {selected_puzzle}'}), 500
+
+        # Convert cell IDs to image paths
+        cell_images = []
+        for cell_id in cell_ids:
+            if cell_id in cell_pool:
+                cell_images.append(f'/captcha_data/{puzzle_type}/{cell_pool[cell_id]["filename"]}')
+            else:
+                return jsonify({'error': f'Cell not found in pool: {cell_id}'}), 500
+
+        # Get reference image (arrow showing light direction)
+        reference_image = f'/captcha_data/{puzzle_type}/{reference_image_file}'
+
+        additional_data = {
+            "reference_image": reference_image,
+            "option_images": cell_images,
+            "grid_size": ground_truth[selected_puzzle].get("grid_size", [4, 4]),
+            "answer": ground_truth[selected_puzzle].get("answer", [])
+        }
+    elif puzzle_type == "Global_Phase_Drift":
+        # Load 16 individual GIF files for the grid
+        puzzle_dir = ground_truth[selected_puzzle].get("puzzle_dir")
+        cell_files = ground_truth[selected_puzzle].get("cell_files", [])
+
+        if not puzzle_dir or not cell_files:
+            return jsonify({'error': f'Invalid Global_Phase_Drift data: {selected_puzzle}'}), 500
+
+        # Build paths to 16 GIF files
+        cell_gifs = []
+        for cell_file in cell_files:
+            cell_gifs.append(f'/captcha_data/{puzzle_type}/{puzzle_dir}/{cell_file}')
+
+        prompt = "Watch the animations carefully - one cell is out of sync with the wave pattern"
+
+        additional_data = {
+            "cell_gifs": cell_gifs,
+            "grid_size": ground_truth[selected_puzzle].get("grid_size", [4, 4]),
+            "answer": ground_truth[selected_puzzle].get("answer", [])
+        }
     elif puzzle_type == "Color_Counting":
         option_images = ground_truth[selected_puzzle].get("options", [])
         if not option_images:
@@ -2085,7 +2208,7 @@ def get_puzzle():
         prompt = ground_truth[selected_puzzle].get("prompt", "Solve the CAPTCHA puzzle")
 
     image_path = None
-    if puzzle_type not in ("Rotation_Match", "Shadow_Plausible", "Mirror",  "Squiggle", "Spooky_Circle_Grid", "Spooky_Circle_Grid_Direction", "Spooky_Shape_Grid", "Color_Cipher", "Color_Counting", "Hole_Counting", "Trajectory_Recovery", "Storyboard_Logic", "Static_Jigsaw", "Transform_Pipeline", "Set_Game", "Dynamic_Jigsaw", "Spooky_Jigsaw"):
+    if puzzle_type not in ("Rotation_Match", "Shadow_Plausible", "Mirror",  "Squiggle", "Spooky_Circle_Grid", "Spooky_Circle_Grid_Direction", "Spooky_Shape_Grid", "Color_Cipher", "Color_Counting", "Hole_Counting", "Rhythm", "Backmost_Layer", "Shadow_Direction", "Global_Phase_Drift", "Trajectory_Recovery", "Storyboard_Logic", "Static_Jigsaw", "Transform_Pipeline", "Set_Game", "Dynamic_Jigsaw", "Spooky_Jigsaw"):
         image_path = f'/captcha_data/{puzzle_type}/{selected_puzzle}'
         if not media_type:
             media_type = "image"
@@ -2105,7 +2228,7 @@ def get_puzzle():
         'input_type': input_type,
         'debug_info': f"Type: {puzzle_type}, Input: {input_type}, Puzzle: {selected_puzzle}"
     }
-    
+
     # Add any additional data for specific puzzle types
     if additional_data:
         response_data.update(additional_data)
@@ -2295,6 +2418,38 @@ def check_answer():
             correct_answer_info = correct_indices
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid answer format for Rotation_Match'}), 400
+    elif puzzle_type == 'Rhythm':
+        try:
+            correct_indices = sorted(ground_truth[puzzle_id].get('answer', []))
+            user_indices = sorted(int(idx) for idx in user_answer)
+            is_correct = user_indices == correct_indices
+            correct_answer_info = correct_indices
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid answer format for Rhythm'}), 400
+    elif puzzle_type == 'Backmost_Layer':
+        try:
+            correct_indices = sorted(ground_truth[puzzle_id].get('answer', []))
+            user_indices = sorted(int(idx) for idx in user_answer)
+            is_correct = user_indices == correct_indices
+            correct_answer_info = correct_indices
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid answer format for Backmost_Layer'}), 400
+    elif puzzle_type == 'Shadow_Direction':
+        try:
+            correct_indices = sorted(ground_truth[puzzle_id].get('answer', []))
+            user_indices = sorted(int(idx) for idx in user_answer)
+            is_correct = user_indices == correct_indices
+            correct_answer_info = correct_indices
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid answer format for Shadow_Direction'}), 400
+    elif puzzle_type == 'Global_Phase_Drift':
+        try:
+            correct_indices = sorted(ground_truth[puzzle_id].get('answer', []))
+            user_indices = sorted(int(idx) for idx in user_answer)
+            is_correct = user_indices == correct_indices
+            correct_answer_info = correct_indices
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid answer format for Global_Phase_Drift'}), 400
     elif puzzle_type == 'Trajectory_Recovery':
         try:
             correct_indices = sorted(ground_truth[puzzle_id].get('answer', []))

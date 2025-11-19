@@ -13,9 +13,15 @@ import textwrap
 import urllib.error
 import urllib.request
 from urllib.parse import urljoin
+from datetime import datetime
+from pathlib import Path
 from typing import Callable, Optional
 
 from browser_use import Agent, Browser
+
+import sys
+sys.path.insert(0, str(Path(__file__).parent))
+from llm_logger import LLMResponseLogger, LoggingLLMWrapper
 
 
 def _build_task_prompt(url: str, limit: int) -> str:
@@ -357,7 +363,7 @@ async def _run_agent(args: argparse.Namespace) -> int:
 		logging.info('Using LLM: %s (actual model: %s)', model_info, actual_model)
 	else:
 		logging.info('Using LLM: %s', model_info)
-	
+
 	# Extract model name and provider for metadata injection
 	# Get model name
 	model_name = args.model if args.model else None
@@ -377,17 +383,27 @@ async def _run_agent(args: argparse.Namespace) -> int:
 			# Use actual model if available
 			if isinstance(actual_model, str):
 				model_name = actual_model.split('(')[0].strip() if '(' in actual_model else actual_model
-	
+
 	# Get provider name - use lowercase with hyphen to match browser-use library format
 	provider_name = llm_name.lower()
 	if llm_name == 'browser-use':
 		provider_name = 'browser-use'  # Keep as-is to match library format
 	elif llm_name == 'azure-openai':
 		provider_name = 'azure-openai'
-	
+
 	# Log initial metadata values for debugging
 	logging.info(f'Initial metadata - Model: {model_name}, Provider: {provider_name}, Framework: browser-use')
-	
+
+	# Wrap LLM with real-time logger if enabled
+	llm_logger = None
+	if getattr(args, 'log_llm', False):
+		experiment_name = f"{llm_name}_{args.model or 'default'}"
+		llm_logger = LLMResponseLogger(
+			log_dir=args.llm_log_dir,
+			experiment_name=experiment_name
+		)
+		llm = LoggingLLMWrapper(llm, llm_logger)
+
 	browser = _create_browser(args)
 	task = _build_task_prompt(args.url, args.limit)
 
@@ -398,6 +414,7 @@ async def _run_agent(args: argparse.Namespace) -> int:
 		'max_history_items': 6,  # Limit conversation history to prevent memory buildup
 		'include_recent_events': False,  # Don't include recent events to reduce context
 		'use_thinking': True,  # Disable thinking mode to reduce memory retention
+		'llm_timeout': 180,  # Increase LLM timeout to 180 seconds (from default 60)
 	}
 	agent = Agent(
 		task=task,
@@ -672,7 +689,13 @@ async def _run_agent(args: argparse.Namespace) -> int:
 	except ValueError as exc:
 		# Commonly raised when the chosen LLM requires API keys.
 		logging.error(str(exc))
+		if llm_logger:
+			llm_logger.close()
 		return 1
+
+	# Close logger
+	if llm_logger:
+		llm_logger.close()
 
 	final_text = history.final_result()
 	successful = history.is_successful()
@@ -788,6 +811,17 @@ def _build_parser() -> argparse.ArgumentParser:
 	parser.add_argument('--window-width', type=int, help='Browser viewport width (pixels).')
 	parser.add_argument('--window-height', type=int, help='Browser viewport height (pixels).')
 	parser.add_argument('--verbose', action='store_true', help='Enable verbose logging.')
+	parser.add_argument(
+		'--log-llm',
+		action='store_true',
+		help='Enable detailed LLM response logging. Saves all LLM inputs/outputs to a JSONL file.'
+	)
+	parser.add_argument(
+		'--llm-log-dir',
+		type=str,
+		default='llm_logs',
+		help='Directory to save LLM logs (default: llm_logs)'
+	)
 	return parser
 
 
