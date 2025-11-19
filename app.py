@@ -23,31 +23,31 @@ recent_types = []
 MAX_RECENT_TYPES = 5
 
 PUZZLE_TYPE_SEQUENCE = [
-    # 'Dice_Count',
-    # 'Shadow_Plausible',
-    # 'Mirror',
-    # 'Squiggle',
-    # 'Color_Cipher',
-    # 'Color_Counting',
-    # 'Hole_Counting',
-    # 'Rotation_Match',
-    # 'Rhythm',
-    #'Backmost_Layer',
-    #'Shadow_Direction',
+    'Dice_Count',
+    'Shadow_Plausible',
+    'Mirror',
+    'Squiggle',
+    'Color_Cipher',
+    'Color_Counting',
+    'Hole_Counting',
+    'Rotation_Match',
+    'Rhythm',
+    'Backmost_Layer',
+    'Shadow_Direction',
     'Global_Phase_Drift',
-    # 'Trajectory_Recovery',
-    # 'Spooky_Size',
-    # 'Spooky_Circle',
-    # 'Spooky_Circle_Grid',
-    # 'Spooky_Shape_Grid',
-    # 'Spooky_Text',
-    # 'Red_Dot',
-    # 'Storyboard_Logic',
-    # 'Static_Jigsaw',
-    # 'Transform_Pipeline',
-    # 'Set_Game',
-    # 'Dynamic_Jigsaw',
-    # 'Spooky_Jigsaw',
+    'Trajectory_Recovery',
+    'Spooky_Size',
+    'Spooky_Circle',
+    'Spooky_Circle_Grid',
+    'Spooky_Shape_Grid',
+    'Spooky_Text',
+    'Red_Dot',
+    'Storyboard_Logic',
+    'Static_Jigsaw',
+    'Transform_Pipeline',
+    'Set_Game',
+    'Dynamic_Jigsaw',
+    'Spooky_Jigsaw',
 ]
 sequential_index = 0
 
@@ -1502,6 +1502,14 @@ def serve_captcha(captcha_type, filename):
 def serve_captcha_subdir(captcha_type, subdir, filename):
     return send_from_directory(os.path.join('captcha_data', captcha_type, subdir), filename)
 
+@app.route('/api/puzzle_types', methods=['GET'])
+def get_puzzle_types_endpoint():
+    """Return the list of available puzzle types."""
+    return jsonify({
+        'types': PUZZLE_TYPE_SEQUENCE,
+        'current_index': sequential_index
+    })
+
 @app.route('/api/get_puzzle', methods=['GET'])
 def get_puzzle():
     global recent_types
@@ -1516,11 +1524,16 @@ def get_puzzle():
 
     # Check if we're in debug mode for a specific type
     debug_type = request.args.get('debug_type')
+    
+    # Check if a specific type is requested via query param
+    requested_type = request.args.get('type')
 
     mode = request.args.get('mode', '').lower()
 
     if debug_type and debug_type in captcha_types:
         puzzle_type = debug_type
+    elif requested_type and requested_type in captcha_types:
+        puzzle_type = requested_type
     elif not is_random and mode == 'sequential':
         global sequential_index
         puzzle_type = PUZZLE_TYPE_SEQUENCE[sequential_index % len(PUZZLE_TYPE_SEQUENCE)]

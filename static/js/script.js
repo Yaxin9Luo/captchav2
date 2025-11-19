@@ -47,6 +47,43 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     displayDifficultyStars('Dice_Count');
+    
+    // Fetch and render puzzle types
+    fetch('/api/puzzle_types')
+        .then(response => response.json())
+        .then(data => {
+            const selector = document.getElementById('puzzle-type-selector');
+            if (selector && data.types) {
+                selector.innerHTML = '';
+                
+                // Add "Random" button
+                const randomBtn = document.createElement('button');
+                randomBtn.textContent = '🎲 Random';
+                randomBtn.className = 'type-btn';
+                randomBtn.style.padding = '6px 12px';
+                randomBtn.style.border = '1px solid #ddd';
+                randomBtn.style.borderRadius = '4px';
+                randomBtn.style.cursor = 'pointer';
+                randomBtn.style.backgroundColor = '#fff';
+                randomBtn.onclick = () => loadNewPuzzle();
+                selector.appendChild(randomBtn);
+
+                data.types.forEach(type => {
+                    const btn = document.createElement('button');
+                    btn.textContent = type.replace(/_/g, ' ');
+                    btn.className = 'type-btn';
+                    btn.style.padding = '6px 12px';
+                    btn.style.border = '1px solid #ddd';
+                    btn.style.borderRadius = '4px';
+                    btn.style.cursor = 'pointer';
+                    btn.style.backgroundColor = '#fff';
+                    btn.onclick = () => loadNewPuzzle(type);
+                    selector.appendChild(btn);
+                });
+            }
+        })
+        .catch(err => console.error('Failed to load puzzle types:', err));
+
     loadNewPuzzle();
 
     function resetInterface() {
@@ -242,11 +279,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function loadNewPuzzle() {
+    function loadNewPuzzle(specificType = null) {
         resetInterface();
         puzzlePrompt.textContent = 'Loading puzzle...';
 
-        fetch('/api/get_puzzle?mode=sequential')
+        let url = '/api/get_puzzle?mode=sequential';
+        if (specificType) {
+            url = `/api/get_puzzle?type=${specificType}`;
+        }
+
+        fetch(url)
             .then((response) => response.json())
             .then((data) => {
                 if (data.error) {
