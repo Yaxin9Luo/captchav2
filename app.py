@@ -35,6 +35,7 @@ PUZZLE_TYPE_SEQUENCE = [
     'Backmost_Layer',
     'Shadow_Direction',
     'Global_Phase_Drift',
+    'Temporal_Object_Continuity',
     'Trajectory_Recovery',
     'Spooky_Size',
     'Spooky_Circle',
@@ -1779,6 +1780,8 @@ def get_puzzle():
         input_type = "shadow_direction_select"
     elif puzzle_type == "Global_Phase_Drift":
         input_type = "global_phase_drift_select"
+    elif puzzle_type == "Temporal_Object_Continuity":
+        input_type = "temporal_continuity_select"
     elif puzzle_type == "Spooky_Text":
         input_type = "text"
     elif puzzle_type == "Color_Cipher":
@@ -2081,6 +2084,26 @@ def get_puzzle():
             cell_gifs.append(f'/captcha_data/{puzzle_type}/{puzzle_dir}/{cell_file}')
 
         prompt = "Watch the animations carefully - one cell is out of sync with the wave pattern"
+
+        additional_data = {
+            "cell_gifs": cell_gifs,
+            "grid_size": ground_truth[selected_puzzle].get("grid_size", [4, 4]),
+            "answer": ground_truth[selected_puzzle].get("answer", [])
+        }
+    elif puzzle_type == "Temporal_Object_Continuity":
+        # Load 16 individual GIF files showing objects passing behind occluders
+        puzzle_dir = ground_truth[selected_puzzle].get("puzzle_dir")
+        cell_files = ground_truth[selected_puzzle].get("cell_files", [])
+
+        if not puzzle_dir or not cell_files:
+            return jsonify({'error': f'Invalid Temporal_Object_Continuity data: {selected_puzzle}'}), 500
+
+        # Build paths to 16 GIF files
+        cell_gifs = []
+        for cell_file in cell_files:
+            cell_gifs.append(f'/captcha_data/{puzzle_type}/{puzzle_dir}/{cell_file}')
+
+        prompt = "Select all cells where the object illegally changes identity while behind an occluder"
 
         additional_data = {
             "cell_gifs": cell_gifs,
@@ -2464,6 +2487,14 @@ def check_answer():
             correct_answer_info = correct_indices
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid answer format for Global_Phase_Drift'}), 400
+    elif puzzle_type == 'Temporal_Object_Continuity':
+        try:
+            correct_indices = sorted(ground_truth[puzzle_id].get('answer', []))
+            user_indices = sorted(int(idx) for idx in user_answer)
+            is_correct = user_indices == correct_indices
+            correct_answer_info = correct_indices
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid answer format for Temporal_Object_Continuity'}), 400
     elif puzzle_type == 'Trajectory_Recovery':
         try:
             correct_indices = sorted(ground_truth[puzzle_id].get('answer', []))

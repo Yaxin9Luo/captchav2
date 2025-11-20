@@ -401,6 +401,7 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'backmost_layer_select':
             case 'shadow_direction_select':
             case 'global_phase_drift_select':
+            case 'temporal_continuity_select':
             case 'trajectory_recovery_select':
             case 'set_game_select':
                 setupGridSelection(data);
@@ -1686,8 +1687,8 @@ document.addEventListener('DOMContentLoaded', () => {
             gridContainer.classList.add('trajectory-recovery-grid');
         }
 
-        // For Global_Phase_Drift, use cell_gifs instead of option_images
-        const optionImages = data.puzzle_type === 'Global_Phase_Drift'
+        // For Global_Phase_Drift and Temporal_Object_Continuity, use cell_gifs instead of option_images
+        const optionImages = (data.puzzle_type === 'Global_Phase_Drift' || data.puzzle_type === 'Temporal_Object_Continuity')
             ? (data.cell_gifs || [])
             : (data.option_images || []);
 
@@ -2241,6 +2242,7 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'backmost_layer_select':
             case 'shadow_direction_select':
             case 'global_phase_drift_select':
+            case 'temporal_continuity_select':
             case 'trajectory_recovery_select':
             case 'set_game_select':
                 answerData.answer = selectedGridCells;
