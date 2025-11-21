@@ -35,7 +35,7 @@
             <div class="stat-icon">📊</div>
             <div class="stat-content">
               <div class="stat-label">Total Puzzles</div>
-              <div class="stat-value" id="total-count">0</div>
+              <div class="stat-value" id="total-count" title="Total puzzles attempted">0</div>
             </div>
           </div>
           <div class="stat-card stat-card-correct">
@@ -55,8 +55,33 @@
           <div class="stat-card stat-card-time">
             <div class="stat-icon">⏱️</div>
             <div class="stat-content">
-              <div class="stat-label">Time Elapsed</div>
+              <div class="stat-label">Question Time</div>
               <div class="stat-value" id="elapsed-time">0.0s</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Selected Type Stats (hidden by default) -->
+        <div class="stats-grid" id="type-stats-section" style="display: none; margin-top: 15px; border-top: 2px solid #eee; padding-top: 15px;">
+          <div class="stat-card stat-card-type">
+            <div class="stat-icon">🎯</div>
+            <div class="stat-content">
+              <div class="stat-label" id="type-label">Selected Type</div>
+              <div class="stat-value" id="type-puzzles">0/0</div>
+            </div>
+          </div>
+          <div class="stat-card stat-card-type-accuracy">
+            <div class="stat-icon">✓</div>
+            <div class="stat-content">
+              <div class="stat-label">Type Accuracy</div>
+              <div class="stat-value" id="type-accuracy">0%</div>
+            </div>
+          </div>
+          <div class="stat-card stat-card-type-time">
+            <div class="stat-icon">⏰</div>
+            <div class="stat-content">
+              <div class="stat-label">Total Type Time</div>
+              <div class="stat-value" id="type-time">0.0s</div>
             </div>
           </div>
         </div>

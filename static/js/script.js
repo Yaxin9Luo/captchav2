@@ -54,6 +54,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const benchmarkStats = { total: 0, correct: 0 };
 
+    // Session and puzzle type tracking
+    let sessionId = 'default';
+    let activePuzzleType = null; // Track the currently selected puzzle type
+    let typeStats = { total: 0, current: 0, correct: 0, time: 0 }; // Stats for the current type
+
     let currentPuzzle = null;
     let bingoSelectedCells = [];
     let shadowSelectedCells = [];
@@ -92,7 +97,51 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     displayDifficultyStars('Dice_Count');
-    
+
+    // Function to update type stats display
+    function updateTypeStatsDisplay() {
+        const typeStatsSection = document.getElementById('type-stats-section');
+        const typeLabel = document.getElementById('type-label');
+        const typePuzzles = document.getElementById('type-puzzles');
+        const typeAccuracy = document.getElementById('type-accuracy');
+        const typeTime = document.getElementById('type-time');
+
+        if (activePuzzleType) {
+            // Show the type stats section
+            if (typeStatsSection) {
+                typeStatsSection.style.display = 'flex';
+            }
+
+            // Update type label
+            if (typeLabel) {
+                typeLabel.textContent = activePuzzleType.replace(/_/g, ' ');
+            }
+
+            // Update type puzzles
+            if (typePuzzles) {
+                typePuzzles.textContent = `${typeStats.current}/${typeStats.total}`;
+            }
+
+            // Update type accuracy
+            if (typeAccuracy) {
+                const accuracy = typeStats.current > 0
+                    ? ((typeStats.correct / typeStats.current) * 100).toFixed(1)
+                    : '0.0';
+                typeAccuracy.textContent = `${accuracy}%`;
+            }
+
+            // Update type time
+            if (typeTime) {
+                typeTime.textContent = `${typeStats.time.toFixed(1)}s`;
+            }
+        } else {
+            // Hide the type stats section
+            if (typeStatsSection) {
+                typeStatsSection.style.display = 'none';
+            }
+        }
+    }
+
     // Fetch and render puzzle types
     fetch('/api/puzzle_types')
         .then(response => response.json())
@@ -110,7 +159,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 randomBtn.style.borderRadius = '4px';
                 randomBtn.style.cursor = 'pointer';
                 randomBtn.style.backgroundColor = '#fff';
-                randomBtn.onclick = () => loadNewPuzzle();
+                randomBtn.onclick = () => {
+                    activePuzzleType = null; // Clear active type for random mode
+                    updateTypeStatsDisplay(); // Reset display to global stats
+                    loadNewPuzzle();
+                };
                 selector.appendChild(randomBtn);
 
                 data.types.forEach(type => {
@@ -332,9 +385,15 @@ document.addEventListener('DOMContentLoaded', () => {
         resetInterface();
         puzzlePrompt.textContent = 'Loading puzzle...';
 
+        // Determine URL based on whether we're continuing with an active type or selecting a new one
         let url = '/api/get_puzzle?mode=sequential';
         if (specificType) {
-            url = `/api/get_puzzle?type=${specificType}`;
+            // User selected a specific type
+            url = `/api/get_puzzle?type=${specificType}&session_id=${sessionId}`;
+            activePuzzleType = specificType;
+        } else if (activePuzzleType) {
+            // Continue with the active type
+            url = `/api/get_puzzle?continue_active=true&session_id=${sessionId}`;
         }
 
         fetch(url)
@@ -349,6 +408,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 actionSequence = [];
                 logAction('puzzle_loaded', { puzzle_type: data.puzzle_type, puzzle_id: data.puzzle_id });
                 startTimer();
+
+                // Update type stats if available
+                if (data.type_stats) {
+                    typeStats.total = data.type_stats.total_puzzles || 0;
+                    typeStats.current = data.type_stats.current_solved || 0;
+                    typeStats.correct = data.type_stats.current_correct || 0;
+                    typeStats.time = data.type_stats.current_time || 0;
+                    updateTypeStatsDisplay();
+                }
 
                 displayDifficultyStars(data.puzzle_type);
                 puzzlePrompt.textContent = data.prompt || 'Solve the CAPTCHA puzzle';
@@ -2173,7 +2241,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const answerData = {
             puzzle_type: currentPuzzle.puzzle_type,
-            puzzle_id: currentPuzzle.puzzle_id
+            puzzle_id: currentPuzzle.puzzle_id,
+            session_id: sessionId
         };
 
         switch (currentPuzzle.input_type) {
@@ -2450,6 +2519,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateStats() {
+        // Always update global stats (top row), regardless of active type
         totalCount.textContent = benchmarkStats.total;
         correctCount.textContent = benchmarkStats.correct;
 

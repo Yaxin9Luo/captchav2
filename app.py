@@ -21,6 +21,18 @@ seen_puzzles = {}
 recent_types = []
 # How many types to remember before allowing repetition
 MAX_RECENT_TYPES = 5
+# Dictionary to track the currently selected puzzle type for each session
+# Key: session_id (or 'default' for stateless), Value: puzzle_type
+active_puzzle_type = {}
+# Dictionary to track per-type attempted puzzles count (both correct and incorrect)
+# Key: (session_id, puzzle_type), Value: count
+per_type_solved_count = {}
+# Dictionary to track per-type CORRECT puzzles count
+# Key: (session_id, puzzle_type), Value: count
+per_type_correct_count = {}
+# Dictionary to track per-type total time spent (in seconds)
+# Key: (session_id, puzzle_type), Value: total_seconds
+per_type_time_spent = {}
 
 PUZZLE_TYPE_SEQUENCE = [
     'Dice_Count',
@@ -1513,7 +1525,10 @@ def get_puzzle_types_endpoint():
 
 @app.route('/api/get_puzzle', methods=['GET'])
 def get_puzzle():
-    global recent_types
+    global recent_types, active_puzzle_type
+
+    # Get session identifier (using 'default' for stateless sessions)
+    session_id = request.args.get('session_id', 'default')
 
     # Check if we should return a random puzzle from any type
     is_random = request.args.get('random', 'false').lower() == 'true'
@@ -1525,44 +1540,74 @@ def get_puzzle():
 
     # Check if we're in debug mode for a specific type
     debug_type = request.args.get('debug_type')
-    
+
     # Check if a specific type is requested via query param
     requested_type = request.args.get('type')
 
     mode = request.args.get('mode', '').lower()
 
+    # Check if we should continue with the active type for this session
+    continue_active = request.args.get('continue_active', 'false').lower() == 'true'
+
     if debug_type and debug_type in captcha_types:
         puzzle_type = debug_type
+        active_puzzle_type[session_id] = puzzle_type
     elif requested_type and requested_type in captcha_types:
         puzzle_type = requested_type
+        active_puzzle_type[session_id] = puzzle_type
+    elif continue_active and session_id in active_puzzle_type:
+        # Continue with the previously selected type
+        puzzle_type = active_puzzle_type[session_id]
     elif not is_random and mode == 'sequential':
         global sequential_index
         puzzle_type = PUZZLE_TYPE_SEQUENCE[sequential_index % len(PUZZLE_TYPE_SEQUENCE)]
         sequential_index += 1
+        active_puzzle_type[session_id] = puzzle_type
     elif is_random:
         # Select a random CAPTCHA type, avoiding recently used types if possible
         available_types = [t for t in captcha_types if t not in recent_types]
-        
+
         # If all types have been used recently, reset the tracking
         if not available_types:
             recent_types = []
             available_types = captcha_types
-        
+
         puzzle_type = random.choice(available_types)
-        
+
         # Add to recent types and maintain maximum length
         recent_types.append(puzzle_type)
         if len(recent_types) > MAX_RECENT_TYPES:
             recent_types.pop(0)
+
+        # Clear active type when selecting random
+        if session_id in active_puzzle_type:
+            del active_puzzle_type[session_id]
     else:
         # Get puzzle type from query parameter
         puzzle_type = request.args.get('type', 'Dice_Count')
         # Check if puzzle type exists
         if puzzle_type not in captcha_types:
             return jsonify({'error': f'Invalid puzzle type: {puzzle_type}'}), 400
+        active_puzzle_type[session_id] = puzzle_type
     
     # Load ground truth for the selected type
     ground_truth = load_ground_truth(puzzle_type)
+
+    # Helper function to add type stats to response
+    def add_type_stats(response_dict, gt):
+        total_puzzles_of_type = len(list(gt.keys())) if gt else 0
+        current_attempted = per_type_solved_count.get((session_id, puzzle_type), 0)
+        current_correct = per_type_correct_count.get((session_id, puzzle_type), 0)
+        current_time = per_type_time_spent.get((session_id, puzzle_type), 0)
+        response_dict['type_stats'] = {
+            'total_puzzles': total_puzzles_of_type,
+            'current_solved': current_attempted,
+            'current_correct': current_correct,
+            'current_time': current_time,
+            'active_type': active_puzzle_type.get(session_id)
+        }
+        return response_dict
+
     if puzzle_type == "Color_Cipher":
         config = ground_truth.get("config", {})
         cipher = generate_color_cipher(config)
@@ -1579,6 +1624,7 @@ def get_puzzle():
             'input_mode': cipher["input_mode"],
             'cipher_state': cipher["cipher_state"]
         }
+        add_type_stats(response_data, ground_truth)
         return jsonify(response_data)
     if puzzle_type == "Red_Dot":
         config = ground_truth.get("config", {})
@@ -1618,6 +1664,7 @@ def get_puzzle():
             'hits_completed': 0,
             'debug_info': f"Type: {puzzle_type}, Input: red_dot_click, Puzzle: {puzzle_id}, {puzzle['debug_info']}"
         }
+        add_type_stats(response_data, ground_truth)
         return jsonify(response_data)
 
     if puzzle_type == "Spooky_Size":
@@ -1659,6 +1706,7 @@ def get_puzzle():
             'canvas_height': 400,
             'debug_info': f"Type: {puzzle_type}, Puzzle: {selected_puzzle}"
         }
+        add_type_stats(response_data, ground_truth)
         return jsonify(response_data)
 
     if not ground_truth:
@@ -1881,6 +1929,7 @@ def get_puzzle():
                     'debug_info': f"Type: {puzzle_type}, Generated puzzle: {puzzle_id}"
                 }
                 response_data.update(additional_data)
+                add_type_stats(response_data, ground_truth)
                 return jsonify(response_data)
             except Exception as e:
                 # Fall back to ground truth if generation fails
@@ -2171,6 +2220,7 @@ def get_puzzle():
                     'debug_info': f"Type: {puzzle_type}, Generated puzzle: {puzzle_id}"
                 }
                 response_data.update(additional_data)
+                add_type_stats(response_data, ground_truth)
                 return jsonify(response_data)
             except Exception as e:
                 # Fall back to ground truth if generation fails
@@ -2269,6 +2319,19 @@ def get_puzzle():
     if additional_data:
         response_data.update(additional_data)
 
+    # Add stats for the current puzzle type
+    total_puzzles_of_type = len(list(ground_truth.keys())) if ground_truth else 0
+    current_attempted = per_type_solved_count.get((session_id, puzzle_type), 0)
+    current_correct = per_type_correct_count.get((session_id, puzzle_type), 0)
+    current_time = per_type_time_spent.get((session_id, puzzle_type), 0)
+    response_data['type_stats'] = {
+        'total_puzzles': total_puzzles_of_type,
+        'current_solved': current_attempted,
+        'current_correct': current_correct,
+        'current_time': current_time,
+        'active_type': active_puzzle_type.get(session_id)
+    }
+
     return jsonify(response_data)
 
 @app.route('/api/get_ground_truth', methods=['POST'])
@@ -2299,12 +2362,14 @@ def get_ground_truth():
 
 @app.route('/api/check_answer', methods=['POST'])
 def check_answer():
+    global per_type_solved_count
     data = request.json
     puzzle_type = data.get('puzzle_type', 'Dice_Count')
     puzzle_id = data.get('puzzle_id')
     user_answer = data.get('answer')
     elapsed_time = float(data.get('elapsed_time', 0))
     action_sequence = data.get('action_sequence', [])
+    session_id = data.get('session_id', 'default')
 
     
     # Validate input
@@ -2835,6 +2900,17 @@ def check_answer():
         else:
             # Fallback for generated puzzles not in ground_truth
             correct_payload = str(correct_answer_info) if correct_answer_info is not None else "Unknown"
+
+    # Track per-type attempted puzzles (both correct and incorrect)
+    key = (session_id, puzzle_type)
+    per_type_solved_count[key] = per_type_solved_count.get(key, 0) + 1
+
+    # Track per-type correct puzzles
+    if is_correct:
+        per_type_correct_count[key] = per_type_correct_count.get(key, 0) + 1
+
+    # Track per-type time spent
+    per_type_time_spent[key] = per_type_time_spent.get(key, 0) + elapsed_time
 
     response_body = {
         'correct': is_correct,
